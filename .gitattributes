@@ -1,0 +1,3 @@
+# Keep Maven wrapper scripts runnable with platform-appropriate line endings.
+mvnw text eol=lf
+mvnw.cmd text eol=crlf

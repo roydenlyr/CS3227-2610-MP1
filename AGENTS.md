@@ -1,0 +1,66 @@
+# CineCLI Project Instructions
+
+These instructions apply to the entire repository.
+
+## Authoritative standards
+
+Before architecture, design, implementation, refactoring, testing, or code review,
+read both authoritative documents in the current workspace:
+
+- `../Resources/CS2113 - Software Engineering for Self-Directed Learners [Printable Version for CS2113].pdf`
+- `../Resources/Java coding standard.pdf`
+
+Keep those PDFs unchanged and outside this repository. Refer to them instead of
+copying their contents here. If they conflict, or a requested change conflicts with
+them, report the conflict rather than choosing silently. The owner has resolved one
+known ambiguity: the Java standard's written rule of 4 spaces for block indentation
+and an additional 8 spaces for continuation indentation takes precedence over
+conflicting rendered examples. Do not use tabs for Java indentation.
+
+## Fixed owner decisions
+
+- Build a Java CLI cinema kiosk and administration system, implementing only
+  explicitly approved requirements.
+- Use Java 25 LTS without preview features.
+- Use Maven with coordinates `cinecli:cinecli:0.1.0-SNAPSHOT` and keep selected
+  tool and dependency versions pinned.
+- Use `cinecli` as the Java package root.
+- Use JUnit 5 for tests.
+- Use structured plain-text files for persistence. Do not introduce a database or
+  decide a data schema without owner approval.
+- Do not add production dependencies, frameworks, or libraries without owner
+  approval.
+- Use `master` as the repository's default branch.
+- Preserve `docs/UserGuide.md`, `docs/DeveloperGuide.md`, `docs/Reflections.md`,
+  and task-specific summaries under `logs/`.
+
+## Engineering workflow
+
+- Inspect the relevant repository state before proposing or making changes.
+- Distinguish explicit requirements, assumptions, and recommendations.
+- For substantial changes, explain the task, ambiguities, approach, relevant
+  standards, and tests before implementation; wait for approval unless the owner
+  explicitly authorizes direct implementation.
+- After approval, keep the change scoped, add appropriate tests, run relevant
+  checks, review the result against the requirements and standards, and report
+  failures or limitations honestly.
+- Make reasonable routine and reversible implementation decisions without asking.
+  Escalate decisions that materially affect product behavior, scope, architecture,
+  persistence format, production dependencies, security, destructive operations,
+  or an existing owner decision.
+
+## Design and implementation rules
+
+- Prefer the simplest maintainable design that satisfies approved requirements.
+- Preserve clear responsibilities, separation of concerns, low coupling, high
+  cohesion, and testability. Do not create speculative layers, abstractions,
+  patterns, packages, or features.
+- Keep CLI input/output separate from business rules when those rules are added.
+- Validate assumptions against existing code and preserve established conventions.
+- Avoid broad unrelated refactoring.
+- Follow the authoritative Java naming, formatting, import, documentation, and
+  readability rules, including the explicit 4/+8 indentation decision.
+- Treat warnings, tests, and coverage as engineering evidence, not substitutes for
+  review or clear requirements.
+- Never commit generated build output, mutable runtime data, machine-specific IDE
+  metadata, secrets, or the external standards PDFs.

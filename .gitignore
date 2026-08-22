@@ -1,0 +1,34 @@
+# Maven and Java output
+/target/
+*.class
+
+# IDE metadata
+/.idea/
+*.iml
+/out/
+/.classpath
+/.project
+/.settings/
+/.vscode/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Mutable application data
+/data/runtime/*
+!/data/runtime/.gitkeep
+
+# JVM diagnostics
+hs_err_pid*
+replay_pid*
+
+# Local secrets and configuration
+.env
+.env.*
+
+# Editor and temporary files
+*.swp
+*.tmp
+*~
+
