@@ -34,3 +34,14 @@ results belong in the corresponding task summary under `logs/`.
   rewrite.
 - Exact output tests are useful for spatial CLI requirements, such as keeping row
   `G` next to `SCREEN` and the numeric axis below row `A`.
+
+## 2026-08-23 - Snack and combo selection
+
+- Storing fixed prices as integer cents avoids floating-point rounding concerns
+  while leaving customer-facing currency formatting in the UI.
+- Returning an explicit seat-selection result keeps the next workflow stage at
+  the application coordinator level and ensures the menu appears only after seat
+  persistence succeeds.
+- Keeping one optional snack or combo choice in memory satisfies the current
+  interaction requirement without inventing quantities, totals, checkout rules,
+  or a persistence schema before those requirements are approved.
