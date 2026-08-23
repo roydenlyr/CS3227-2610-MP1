@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import cinecli.model.Bill;
 import cinecli.model.ContentRating;
 import cinecli.model.Movie;
+import cinecli.model.PromoCode;
 import cinecli.model.Screening;
 import cinecli.model.SeatCoordinate;
 import cinecli.model.SnackMenuItem;
@@ -16,6 +18,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -127,6 +130,76 @@ class CustomerUiTest {
                         "- G4: Adult - S$11.00",
                         "- G5: Senior - S$4.50"),
                 nonblankLines);
+    }
+
+    @Test
+    void requestPromoCode_displaysCodesDiscountsAndSkipOption() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.requestPromoCode();
+
+        assertEquals(
+                "Enter a promo code (CS2103 for 20% off or CS3227 for 99% off),"
+                        + " or press ENTER to skip:",
+                output.toString().strip());
+    }
+
+    @Test
+    void showBill_mixedSelectionsAndPromo_displaysItemizedExactAmounts() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+        Bill bill = new Bill(
+                List.of(
+                        new TicketSelection(
+                                new SeatCoordinate('G', 4), TicketType.ADULT),
+                        new TicketSelection(
+                                new SeatCoordinate('G', 5), TicketType.SENIOR)),
+                List.of(
+                        new SnackSelection(SnackMenuItem.POPCORN_COMBO, 2),
+                        new SnackSelection(SnackMenuItem.NACHOS, 3)),
+                Optional.of(PromoCode.CS2103));
+
+        customerUi.showBill(bill);
+
+        List<String> nonblankLines = output.toString().lines()
+                .filter(line -> !line.isBlank())
+                .toList();
+        assertEquals(
+                List.of(
+                        "Bill Summary",
+                        "Tickets:",
+                        "- G4: Adult - S$11.00",
+                        "- G5: Senior - S$4.50",
+                        "Ticket subtotal: S$15.50",
+                        "Snacks and Combos:",
+                        "- 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each",
+                        "- 3 x Nachos - S$6.00 each",
+                        "Snack subtotal: S$32.00",
+                        "Subtotal: S$47.50",
+                        "Promo code: CS2103 (20% off)",
+                        "Discount: -S$9.50",
+                        "Total: S$38.00"),
+                nonblankLines);
+    }
+
+    @Test
+    void showBill_maximumSnackQuantity_formatsLongAmounts() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+        Bill bill = new Bill(
+                List.of(new TicketSelection(
+                        new SeatCoordinate('A', 1), TicketType.ADULT)),
+                List.of(new SnackSelection(
+                        SnackMenuItem.NACHOS_COMBO, Integer.MAX_VALUE)));
+
+        customerUi.showBill(bill);
+
+        assertAll(
+                () -> assertTrue(output.toString().contains(
+                        "Snack subtotal: S$17179869176.00")),
+                () -> assertTrue(output.toString().contains(
+                        "Total: S$17179869187.00")));
     }
 
     @Test

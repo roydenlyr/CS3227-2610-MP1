@@ -1,6 +1,8 @@
 package cinecli.ui;
 
+import cinecli.model.Bill;
 import cinecli.model.Movie;
+import cinecli.model.PromoCode;
 import cinecli.model.Screening;
 import cinecli.model.ScreeningSelection;
 import cinecli.model.SeatCoordinate;
@@ -221,9 +223,7 @@ public final class CustomerUi {
         output.println();
         output.println("Selected Tickets");
         for (TicketSelection selection : selections) {
-            TicketType ticketType = selection.ticketType();
-            output.println("- " + selection.seat() + ": " + ticketType.getDisplayName()
-                    + " - " + formatPrice(ticketType.getPriceInCents()));
+            output.println("- " + formatTicketSelection(selection));
         }
     }
 
@@ -321,6 +321,64 @@ public final class CustomerUi {
      */
     public void showSnackSelectionSkipped() {
         output.println("No snacks or combos selected.");
+    }
+
+    /**
+     * Requests an optional promotion code.
+     *
+     * @return Submitted code, a blank line to skip, or null if input ended or could not be read.
+     */
+    public String requestPromoCode() {
+        output.println();
+        output.println("Enter a promo code (CS2103 for 20% off or CS3227 for 99% off),"
+                + " or press ENTER to skip:");
+        return readLine();
+    }
+
+    /**
+     * Shows why a promotion code was rejected.
+     *
+     * @param message Rejection explanation.
+     */
+    public void showPromoCodeError(String message) {
+        output.println("Invalid promo code: " + message);
+    }
+
+    /**
+     * Shows the itemized bill and exact payable total.
+     *
+     * @param bill Completed customer bill.
+     */
+    public void showBill(Bill bill) {
+        Objects.requireNonNull(bill);
+        output.println();
+        output.println("Bill Summary");
+        output.println("Tickets:");
+        for (TicketSelection selection : bill.ticketSelections()) {
+            output.println("- " + formatTicketSelection(selection));
+        }
+        output.println("Ticket subtotal: " + formatPrice(bill.getTicketSubtotalInCents()));
+
+        output.println("Snacks and Combos:");
+        if (bill.snackSelections().isEmpty()) {
+            output.println("None");
+        } else {
+            for (SnackSelection selection : bill.snackSelections()) {
+                output.println("- " + formatSnackSelection(selection));
+            }
+        }
+        output.println("Snack subtotal: " + formatPrice(bill.getSnackSubtotalInCents()));
+        output.println("Subtotal: " + formatPrice(bill.getSubtotalInCents()));
+
+        if (bill.promoCode().isPresent()) {
+            PromoCode promoCode = bill.promoCode().orElseThrow();
+            output.println("Promo code: " + promoCode.getCode()
+                    + " (" + promoCode.getDiscountPercentage() + "% off)");
+            output.println("Discount: -" + formatPrice(bill.getDiscountInCents()));
+        } else {
+            output.println("Promo code: None");
+        }
+        output.println("Total: " + formatPrice(bill.getTotalInCents()));
     }
 
     /**
@@ -436,7 +494,13 @@ public final class CustomerUi {
                 + " - " + formatPrice(selection.menuItem().getPriceInCents()) + " each";
     }
 
-    private String formatPrice(int priceInCents) {
+    private String formatTicketSelection(TicketSelection selection) {
+        TicketType ticketType = selection.ticketType();
+        return selection.seat() + ": " + ticketType.getDisplayName()
+                + " - " + formatPrice(ticketType.getPriceInCents());
+    }
+
+    private String formatPrice(long priceInCents) {
         return String.format(
                 Locale.ROOT, "S$%d.%02d", priceInCents / 100, priceInCents % 100);
     }

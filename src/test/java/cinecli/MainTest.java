@@ -46,7 +46,7 @@ class MainTest {
         StringWriter errorOutput = new StringWriter();
 
         Main.run(
-                new StringReader("\n3A\nA1\nY\n3\n5\n2\n0\n"),
+                new StringReader("\n3A\nA1\nY\n3\n5\n2\n0\ncs3227\n"),
                 output,
                 errorOutput,
                 runtimeCatalog,
@@ -60,6 +60,9 @@ class MainTest {
                 () -> assertTrue(output.toString().contains("Snack and Combo Menu")),
                 () -> assertTrue(output.toString().contains(
                         "- 2 x Nachos Combo (Nachos + Soft Drink) - S$8.00 each")),
+                () -> assertTrue(output.toString().contains(
+                        "Promo code: CS3227 (99% off)")),
+                () -> assertTrue(output.toString().contains("Total: S$0.23")),
                 () -> assertEquals(
                         "CINECLI-SEATS\t1\nTAKEN_SEAT\tSCR-005\tA1\n",
                         Files.readString(runtimeSeats, UTF_8)),

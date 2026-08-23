@@ -1,6 +1,8 @@
 package cinecli;
 
+import cinecli.model.Bill;
 import cinecli.model.Movie;
+import cinecli.model.PromoCode;
 import cinecli.model.Screening;
 import cinecli.model.ScreeningSelection;
 import cinecli.model.SeatCoordinate;
@@ -20,10 +22,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * Coordinates the customer catalog, seat selection, ticket selection, and snack selection.
+ * Coordinates customer catalog, seat, ticket, snack, promotion, and billing operations.
  */
 public final class CustomerApplication {
     private static final List<SnackMenuItem> SNACK_MENU_ITEMS =
@@ -49,7 +52,7 @@ public final class CustomerApplication {
     }
 
     /**
-     * Runs the customer workflow from the welcome screen through snack selection.
+     * Runs the customer workflow from the welcome screen through the final bill.
      */
     public void run() {
         customerUi.showWelcome();
@@ -79,10 +82,29 @@ public final class CustomerApplication {
         if (confirmedSeats == null) {
             return;
         }
-        if (runTicketSelection(confirmedSeats) == null) {
-            return;
+
+        Bill bill = requestBill(confirmedSeats);
+        if (bill != null) {
+            customerUi.showBill(bill);
         }
-        runSnackSelection();
+    }
+
+    private Bill requestBill(Set<SeatCoordinate> confirmedSeats) {
+        List<TicketSelection> ticketSelections = runTicketSelection(confirmedSeats);
+        if (ticketSelections == null) {
+            return null;
+        }
+        List<SnackSelection> snackSelections = runSnackSelection();
+        if (snackSelections == null) {
+            return null;
+        }
+        PromoSelection promoSelection = requestPromoCode();
+        if (promoSelection == null) {
+            return null;
+        }
+
+        return new Bill(
+                ticketSelections, snackSelections, promoSelection.promoCode());
     }
 
     private SelectedScreening requestScreening(List<Movie> movies) {
@@ -213,28 +235,30 @@ public final class CustomerApplication {
         }
     }
 
-    private void runSnackSelection() {
+    private List<SnackSelection> runSnackSelection() {
         customerUi.showSnackMenu(SNACK_MENU_ITEMS);
         Map<SnackMenuItem, SnackSelection> selections = new LinkedHashMap<>();
         while (true) {
             String input = customerUi.requestSnackSelection();
             if (input == null) {
-                return;
+                return null;
             }
             if (input.strip().equals("0")) {
+                List<SnackSelection> completedSelections =
+                        List.copyOf(selections.values());
                 if (selections.isEmpty()) {
                     customerUi.showSnackSelectionSkipped();
                 } else {
-                    customerUi.showSnackSelections(List.copyOf(selections.values()));
+                    customerUi.showSnackSelections(completedSelections);
                 }
-                return;
+                return completedSelections;
             }
 
             try {
                 SnackMenuItem menuItem = SnackMenuItem.parse(input);
                 SnackSelection selection = requestSnackQuantity(menuItem);
                 if (selection == null) {
-                    return;
+                    return null;
                 }
 
                 boolean isUpdated = selections.put(menuItem, selection) != null;
@@ -245,6 +269,24 @@ public final class CustomerApplication {
                 }
             } catch (IllegalArgumentException exception) {
                 customerUi.showSnackSelectionError(exception.getMessage());
+            }
+        }
+    }
+
+    private PromoSelection requestPromoCode() {
+        while (true) {
+            String input = customerUi.requestPromoCode();
+            if (input == null) {
+                return null;
+            }
+            if (input.isBlank()) {
+                return new PromoSelection(Optional.empty());
+            }
+
+            try {
+                return new PromoSelection(Optional.of(PromoCode.parse(input)));
+            } catch (IllegalArgumentException exception) {
+                customerUi.showPromoCodeError(exception.getMessage());
             }
         }
     }
@@ -324,6 +366,12 @@ public final class CustomerApplication {
     }
 
     private record SelectedScreening(Movie movie, Screening screening) {
+    }
+
+    private record PromoSelection(Optional<PromoCode> promoCode) {
+        private PromoSelection {
+            Objects.requireNonNull(promoCode);
+        }
     }
 
 }
