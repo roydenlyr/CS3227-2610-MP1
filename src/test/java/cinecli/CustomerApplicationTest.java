@@ -93,7 +93,7 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n3b\ng4 g5\ny\n4\n2\n2\n3\n0\n");
+                catalog, null, "\n3b\ng5 g4\ny\n1\n2\n4\n2\n2\n3\n0\n");
 
         String persistedSeats = Files.readString(applicationOutput.runtimeSeats(), UTF_8);
         String normalOutput = applicationOutput.normalOutput();
@@ -101,6 +101,8 @@ class CustomerApplicationTest {
                 .filter(line -> line.startsWith("G   "))
                 .toList();
         int seatsConfirmedIndex = normalOutput.indexOf("Seats confirmed: G4, G5");
+        int ticketMenuIndex = normalOutput.indexOf("Ticket Types");
+        int ticketSelectionsIndex = normalOutput.indexOf("Selected Tickets");
         int snackMenuIndex = normalOutput.indexOf("Snack and Combo Menu");
         int comboAddedIndex = normalOutput.indexOf(
                 "Snack/combo added: 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each");
@@ -114,7 +116,15 @@ class CustomerApplicationTest {
                 () -> assertTrue(normalOutput.contains(
                         "Confirm seats G4, G5? (Y/N):")),
                 () -> assertTrue(seatsConfirmedIndex >= 0),
-                () -> assertTrue(snackMenuIndex > seatsConfirmedIndex),
+                () -> assertTrue(ticketMenuIndex > seatsConfirmedIndex),
+                () -> assertTrue(ticketSelectionsIndex > ticketMenuIndex),
+                () -> assertTrue(snackMenuIndex > ticketSelectionsIndex),
+                () -> assertTrue(normalOutput.contains(
+                        "Choose a ticket type for seat G4 (1-3):")),
+                () -> assertTrue(normalOutput.contains(
+                        "Choose a ticket type for seat G5 (1-3):")),
+                () -> assertTrue(normalOutput.contains("- G4: Adult - S$11.00")),
+                () -> assertTrue(normalOutput.contains("- G5: Senior - S$4.50")),
                 () -> assertTrue(comboAddedIndex > snackMenuIndex),
                 () -> assertTrue(snackAddedIndex > comboAddedIndex),
                 () -> assertTrue(selectionsIndex > snackAddedIndex),
@@ -142,7 +152,7 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n1A\nA1\nY\n0\n");
+                catalog, null, "\n1A\nA1\nY\n3\n0\n");
 
         assertAll(
                 () -> assertTrue(applicationOutput.normalOutput().contains(
@@ -163,7 +173,7 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n1A\nA1\nY\ntwo\n6\n2\n3\n0\n");
+                catalog, null, "\n1A\nA1\nY\n1\ntwo\n6\n2\n3\n0\n");
 
         List<String> snackErrors = applicationOutput.normalOutput().lines()
                 .filter(line -> line.startsWith("Invalid snack selection:"))
@@ -186,10 +196,10 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n1A\nA1\nY\n1\n2\n1\n5\n0\n");
+                catalog, null, "\n1A\nA1\nY\n1\n1\n2\n1\n5\n0\n");
 
         List<String> summaryLines = applicationOutput.normalOutput().lines()
-                .filter(line -> line.startsWith("- "))
+                .filter(line -> line.startsWith("- ") && line.contains("Popcorn"))
                 .toList();
         assertAll(
                 () -> assertTrue(applicationOutput.normalOutput().contains(
@@ -209,7 +219,7 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n1A\nA1\nY\n1\n\ntwo\n1.5\n2147483648\n2\n0\n");
+                catalog, null, "\n1A\nA1\nY\n1\n1\n\ntwo\n1.5\n2147483648\n2\n0\n");
 
         List<String> quantityErrors = applicationOutput.normalOutput().lines()
                 .filter(line -> line.startsWith("Invalid snack quantity:"))
@@ -237,7 +247,7 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n1A\nA1\nY\n1\n0\n-1\n1\n0\n");
+                catalog, null, "\n1A\nA1\nY\n1\n1\n0\n-1\n1\n0\n");
 
         List<String> quantityErrors = applicationOutput.normalOutput().lines()
                 .filter(line -> line.startsWith("Invalid snack quantity:"))
@@ -260,9 +270,9 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput firstRun = runWithData(
-                catalog, null, "\n1A\nA1\nY\n3\n2\n0\n");
+                catalog, null, "\n1A\nA1\nY\n1\n3\n2\n0\n");
         ApplicationOutput secondRun = runWithData(
-                catalog, null, "\n1A\nA2\nY\n0\n");
+                catalog, null, "\n1A\nA2\nY\n2\n0\n");
         Set<String> runtimeFileNames;
         try (Stream<Path> runtimeFiles = Files.list(tempDirectory)) {
             runtimeFileNames = runtimeFiles
@@ -295,12 +305,14 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, seats, "\n1A\nG4\nG5\nY\n");
+                catalog, seats, "\n1A\nG4\nG5\nY\n2\n");
 
         assertAll(
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "seat G4 is already taken")),
                 () -> assertTrue(applicationOutput.normalOutput().contains("Seats confirmed: G5")),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "- G5: Senior - S$4.50")),
                 () -> assertEquals(
                         "CINECLI-SEATS\t1\n"
                                 + "TAKEN_SEAT\tSCR-001\tG4\n"
@@ -325,6 +337,8 @@ class CustomerApplicationTest {
                         "Confirm seats G4? (Y/N):")),
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "Tentative seat selection cleared.")),
+                () -> assertFalse(applicationOutput.normalOutput().contains(
+                        "Ticket Types")),
                 () -> assertFalse(applicationOutput.normalOutput().contains(
                         "Snack and Combo Menu")),
                 () -> assertEquals(
@@ -360,7 +374,7 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n1A\nH1\nA1 A1\nA1\nMAYBE\nY\n");
+                catalog, null, "\n1A\nH1\nA1 A1\nA1\nMAYBE\nY\n1\n");
 
         assertAll(
                 () -> assertTrue(applicationOutput.normalOutput().contains(
@@ -370,6 +384,37 @@ class CustomerApplicationTest {
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "enter Y to confirm or N to choose again")),
                 () -> assertTrue(applicationOutput.normalOutput().contains("Seats confirmed: A1")),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "- A1: Adult - S$11.00")),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_invalidTicketTypes_repromptsForSameSeatBeforeContinuing() throws IOException {
+        String catalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-001\tFirst Film\tPG13
+                SCREENING\tSCR-001\tMOV-001\t2026-10-10\t10:00
+                """;
+
+        ApplicationOutput applicationOutput = runWithData(
+                catalog, null, "\n1A\nA1\nY\n\ntwo\n0\n4\n3\n0\n");
+
+        List<String> ticketErrors = applicationOutput.normalOutput().lines()
+                .filter(line -> line.startsWith("Invalid ticket type:"))
+                .toList();
+        long ticketPromptCount = applicationOutput.normalOutput().lines()
+                .filter(line -> line.equals("Choose a ticket type for seat A1 (1-3):"))
+                .count();
+        assertAll(
+                () -> assertEquals(4, ticketErrors.size()),
+                () -> assertTrue(ticketErrors.stream().allMatch(line -> line.contains(
+                        "selection must be a ticket type number from 1 through 3"))),
+                () -> assertEquals(5, ticketPromptCount),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "- A1: Student - S$7.00")),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "Snack and Combo Menu")),
                 () -> assertEquals("", applicationOutput.errorOutput()));
     }
 

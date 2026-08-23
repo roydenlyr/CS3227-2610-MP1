@@ -6,6 +6,8 @@ import cinecli.model.ScreeningSelection;
 import cinecli.model.SeatCoordinate;
 import cinecli.model.SnackMenuItem;
 import cinecli.model.SnackSelection;
+import cinecli.model.TicketSelection;
+import cinecli.model.TicketType;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -19,7 +21,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Displays the customer catalog, seat-selection, and snack-selection workflow.
+ * Displays the customer catalog, seat selection, ticket selection, and snack selection.
  */
 public final class CustomerUi {
     private static final DateTimeFormatter SCREENING_TIME_FORMATTER =
@@ -170,6 +172,59 @@ public final class CustomerUi {
     public void showSeatsConfirmed(Set<SeatCoordinate> seats) {
         String seatList = formatSeatList(seats);
         output.println("Seats confirmed: " + seatList);
+    }
+
+    /**
+     * Shows the fixed customer ticket types and prices.
+     *
+     * @param ticketTypes Ticket types in display order.
+     */
+    public void showTicketTypeMenu(List<TicketType> ticketTypes) {
+        Objects.requireNonNull(ticketTypes);
+        output.println();
+        output.println("Ticket Types");
+        for (TicketType ticketType : ticketTypes) {
+            output.println(ticketType.getMenuNumber() + ". "
+                    + ticketType.getDisplayName() + " - "
+                    + formatPrice(ticketType.getPriceInCents()));
+        }
+    }
+
+    /**
+     * Requests a customer ticket type for one confirmed seat.
+     *
+     * @param seat Confirmed seat requiring a ticket type.
+     * @return Submitted ticket type number, or null if input ended or could not be read.
+     */
+    public String requestTicketType(SeatCoordinate seat) {
+        Objects.requireNonNull(seat);
+        output.println("Choose a ticket type for seat " + seat + " (1-3):");
+        return readLine();
+    }
+
+    /**
+     * Shows why a customer ticket type was rejected.
+     *
+     * @param message Rejection explanation.
+     */
+    public void showTicketTypeError(String message) {
+        output.println("Invalid ticket type: " + message);
+    }
+
+    /**
+     * Shows the selected ticket type and price for every confirmed seat.
+     *
+     * @param selections Completed ticket selections in seat order.
+     */
+    public void showTicketSelections(List<TicketSelection> selections) {
+        Objects.requireNonNull(selections);
+        output.println();
+        output.println("Selected Tickets");
+        for (TicketSelection selection : selections) {
+            TicketType ticketType = selection.ticketType();
+            output.println("- " + selection.seat() + ": " + ticketType.getDisplayName()
+                    + " - " + formatPrice(ticketType.getPriceInCents()));
+        }
     }
 
     /**

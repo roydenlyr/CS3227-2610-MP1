@@ -46,7 +46,7 @@ class MainTest {
         StringWriter errorOutput = new StringWriter();
 
         Main.run(
-                new StringReader("\n3A\nA1\nY\n5\n2\n0\n"),
+                new StringReader("\n3A\nA1\nY\n3\n5\n2\n0\n"),
                 output,
                 errorOutput,
                 runtimeCatalog,
@@ -55,6 +55,8 @@ class MainTest {
         assertAll(
                 () -> assertTrue(output.toString().contains("Movie: Crimson Harbor")),
                 () -> assertTrue(output.toString().contains("Seats confirmed: A1")),
+                () -> assertTrue(output.toString().contains(
+                        "- A1: Student - S$7.00")),
                 () -> assertTrue(output.toString().contains("Snack and Combo Menu")),
                 () -> assertTrue(output.toString().contains(
                         "- 2 x Nachos Combo (Nachos + Soft Drink) - S$8.00 each")),

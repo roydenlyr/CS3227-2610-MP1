@@ -6,11 +6,14 @@ import cinecli.model.ScreeningSelection;
 import cinecli.model.SeatCoordinate;
 import cinecli.model.SnackMenuItem;
 import cinecli.model.SnackSelection;
+import cinecli.model.TicketSelection;
+import cinecli.model.TicketType;
 import cinecli.storage.CatalogStorage;
 import cinecli.storage.CatalogStorageException;
 import cinecli.storage.SeatStorage;
 import cinecli.storage.SeatStorageException;
 import cinecli.ui.CustomerUi;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,11 +23,12 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Coordinates the customer catalog, seat-selection, and snack-selection workflow.
+ * Coordinates the customer catalog, seat selection, ticket selection, and snack selection.
  */
 public final class CustomerApplication {
     private static final List<SnackMenuItem> SNACK_MENU_ITEMS =
             List.of(SnackMenuItem.values());
+    private static final List<TicketType> TICKET_TYPES = List.of(TicketType.values());
 
     private final CustomerUi customerUi;
     private final CatalogStorage catalogStorage;
@@ -70,9 +74,12 @@ public final class CustomerApplication {
         if (selectedScreening == null) {
             return;
         }
-        SeatSelectionResult seatSelectionResult = runSeatSelection(
+        Set<SeatCoordinate> confirmedSeats = runSeatSelection(
                 selectedScreening, collectScreeningIds(movies));
-        if (seatSelectionResult != SeatSelectionResult.CONFIRMED) {
+        if (confirmedSeats == null) {
+            return;
+        }
+        if (runTicketSelection(confirmedSeats) == null) {
             return;
         }
         runSnackSelection();
@@ -112,7 +119,7 @@ public final class CustomerApplication {
         return new SelectedScreening(movie, screening);
     }
 
-    private SeatSelectionResult runSeatSelection(
+    private Set<SeatCoordinate> runSeatSelection(
             SelectedScreening selectedScreening, Set<String> knownScreeningIds) {
         Set<SeatCoordinate> takenSeats;
         try {
@@ -120,7 +127,7 @@ public final class CustomerApplication {
                     selectedScreening.screening().id(), knownScreeningIds);
         } catch (SeatStorageException exception) {
             customerUi.showSeatStorageError(exception.getMessage());
-            return SeatSelectionResult.NOT_CONFIRMED;
+            return null;
         }
 
         while (true) {
@@ -128,16 +135,16 @@ public final class CustomerApplication {
                     selectedScreening.movie(), selectedScreening.screening(), takenSeats);
             if (takenSeats.size() == SeatCoordinate.TOTAL_SEATS) {
                 customerUi.showNoSeatsAvailable();
-                return SeatSelectionResult.NOT_CONFIRMED;
+                return null;
             }
 
             String input = customerUi.requestSeatSelection();
             if (input == null) {
-                return SeatSelectionResult.NOT_CONFIRMED;
+                return null;
             }
             if (input.strip().equalsIgnoreCase("CANCEL")) {
                 customerUi.showSeatSelectionCancelled();
-                return SeatSelectionResult.NOT_CONFIRMED;
+                return null;
             }
 
             Set<SeatCoordinate> tentativeSeats;
@@ -156,7 +163,7 @@ public final class CustomerApplication {
 
             Boolean isConfirmed = requestConfirmation(tentativeSeats);
             if (isConfirmed == null) {
-                return SeatSelectionResult.NOT_CONFIRMED;
+                return null;
             }
             if (!isConfirmed) {
                 customerUi.showTentativeSelectionCleared();
@@ -169,9 +176,40 @@ public final class CustomerApplication {
                 customerUi.showSeatsConfirmed(tentativeSeats);
             } catch (SeatStorageException exception) {
                 customerUi.showSeatStorageError(exception.getMessage());
-                return SeatSelectionResult.NOT_CONFIRMED;
+                return null;
             }
-            return SeatSelectionResult.CONFIRMED;
+            return tentativeSeats;
+        }
+    }
+
+    private List<TicketSelection> runTicketSelection(Set<SeatCoordinate> confirmedSeats) {
+        customerUi.showTicketTypeMenu(TICKET_TYPES);
+        List<TicketSelection> selections = new ArrayList<>();
+        for (SeatCoordinate seat : confirmedSeats.stream().sorted().toList()) {
+            TicketSelection selection = requestTicketSelection(seat);
+            if (selection == null) {
+                return null;
+            }
+            selections.add(selection);
+        }
+
+        List<TicketSelection> completedSelections = List.copyOf(selections);
+        customerUi.showTicketSelections(completedSelections);
+        return completedSelections;
+    }
+
+    private TicketSelection requestTicketSelection(SeatCoordinate seat) {
+        while (true) {
+            String input = customerUi.requestTicketType(seat);
+            if (input == null) {
+                return null;
+            }
+
+            try {
+                return new TicketSelection(seat, TicketType.parse(input));
+            } catch (IllegalArgumentException exception) {
+                customerUi.showTicketTypeError(exception.getMessage());
+            }
         }
     }
 
@@ -288,8 +326,4 @@ public final class CustomerApplication {
     private record SelectedScreening(Movie movie, Screening screening) {
     }
 
-    private enum SeatSelectionResult {
-        CONFIRMED,
-        NOT_CONFIRMED
-    }
 }

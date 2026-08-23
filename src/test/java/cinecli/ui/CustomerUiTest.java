@@ -10,6 +10,8 @@ import cinecli.model.Screening;
 import cinecli.model.SeatCoordinate;
 import cinecli.model.SnackMenuItem;
 import cinecli.model.SnackSelection;
+import cinecli.model.TicketSelection;
+import cinecli.model.TicketType;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.LocalDateTime;
@@ -74,6 +76,57 @@ class CustomerUiTest {
                 () -> assertEquals("20", axisFields[19]),
                 () -> assertTrue(output.toString().contains(
                         "X = Taken or tentatively selected")));
+    }
+
+    @Test
+    void showTicketTypeMenu_fixedTypes_displaysExactPrices() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.showTicketTypeMenu(List.of(TicketType.values()));
+
+        List<String> nonblankLines = output.toString().lines()
+                .filter(line -> !line.isBlank())
+                .toList();
+        assertEquals(
+                List.of(
+                        "Ticket Types",
+                        "1. Adult - S$11.00",
+                        "2. Senior - S$4.50",
+                        "3. Student - S$7.00"),
+                nonblankLines);
+    }
+
+    @Test
+    void requestTicketType_confirmedSeat_identifiesSeat() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.requestTicketType(new SeatCoordinate('G', 4));
+
+        assertEquals(
+                "Choose a ticket type for seat G4 (1-3):",
+                output.toString().strip());
+    }
+
+    @Test
+    void showTicketSelections_multipleTypes_displaysSeatOrderAndPrices() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.showTicketSelections(List.of(
+                new TicketSelection(new SeatCoordinate('G', 4), TicketType.ADULT),
+                new TicketSelection(new SeatCoordinate('G', 5), TicketType.SENIOR)));
+
+        List<String> nonblankLines = output.toString().lines()
+                .filter(line -> !line.isBlank())
+                .toList();
+        assertEquals(
+                List.of(
+                        "Selected Tickets",
+                        "- G4: Adult - S$11.00",
+                        "- G5: Senior - S$4.50"),
+                nonblankLines);
     }
 
     @Test
