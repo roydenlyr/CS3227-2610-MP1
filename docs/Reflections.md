@@ -57,3 +57,16 @@ results belong in the corresponding task summary under `logs/`.
   in which different items were first chosen.
 - Separating the item prompt from the quantity prompt allows invalid quantities to
   be retried without forcing customers to re-enter a valid item number.
+
+## 2026-08-23 - Ticket pricing and promotions
+
+- Associating a ticket type with each sorted seat coordinate makes the demographic
+  assignment deterministic and prevents ticket quantities from drifting away from
+  the number of confirmed seats.
+- Keeping percentages in a fixed enum and all monetary amounts in checked `long`
+  cents makes both the allowed promotions and their arithmetic explicit without a
+  floating-point dependency.
+- Rounding the final payable amount, then deriving the displayed discount, avoids
+  a one-cent inconsistency when a percentage produces exactly half a cent.
+- A session-only bill satisfies the approved checkout behavior while preserving
+  the existing persistence boundary until a booking schema is approved.

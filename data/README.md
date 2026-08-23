@@ -74,4 +74,8 @@ as a rendered grid. During interaction, `X` also represents seats tentatively
 selected in the current session; tentative choices are persisted only after the
 user confirms them.
 
+Ticket assignments, snack and combo selections, promo codes, and calculated bills
+are session-only. They do not create additional runtime files or fields in either
+version 1 format.
+
 Do not store credentials or other secrets here.

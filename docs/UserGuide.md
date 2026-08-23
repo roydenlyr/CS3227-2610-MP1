@@ -3,14 +3,15 @@
 ## Project status
 
 CineCLI currently provides a customer workflow from the welcome screen to the
-movie catalog, screening selection, terminal seat selection, and an optional
-snack and combo selection with quantities. Each movie displays its content rating
-and lettered screening dates and times.
+movie catalog, screening selection, terminal seat selection, demographic ticket
+selection, optional snacks and combos, an optional promo code, and an itemized
+bill. Each movie displays its content rating and lettered screening dates and
+times.
 
 Seat occupancy is stored temporarily until booking records become the source of
-truth. Snack and combo choices and quantities are session-only. Administration,
-discounts, totals, checkout, payment, and complete booking records are not part of
-this milestone.
+truth. Ticket assignments, snack and combo choices, promo codes, and bills are
+session-only. Administration, payment, and complete booking records are not part
+of this milestone.
 
 ## Prerequisite
 
@@ -88,9 +89,26 @@ available.`
 Confirmed selections remain `X` on later runs. CineCLI rejects malformed,
 duplicate, or already-taken coordinates and asks for another selection.
 
+## Choose a ticket type
+
+After seats are confirmed, CineCLI displays the fixed ticket menu:
+
+```text
+Ticket Types
+1. Adult - S$11.00
+2. Senior - S$4.50
+3. Student - S$7.00
+```
+
+CineCLI requests one ticket type for each confirmed seat, in coordinate order. For
+example, seats `G4 G5` are prompted as `G4` followed by `G5`, even if they were
+entered in a different order. Enter `1`, `2`, or `3` at each prompt. Invalid,
+blank, or unavailable numbers are rejected, and CineCLI asks again for the same
+seat before moving on.
+
 ## Choose a snack or combo
 
-After CineCLI successfully confirms the seats, it displays this fixed menu:
+After every confirmed seat has a ticket type, CineCLI displays this fixed menu:
 
 ```text
 Snack and Combo Menu
@@ -117,9 +135,46 @@ duplicate line. CineCLI rejects malformed or unavailable item numbers and asks f
 another item. It rejects zero, negative, fractional, nonnumeric, and out-of-range
 quantities, then asks again for the quantity of the same item.
 
-Selections are not persisted and are not yet included in a booking, total,
-checkout, or payment flow. Displayed prices are unit prices; CineCLI does not
-calculate line subtotals or an order total in this milestone.
+Displayed prices beside selections remain unit prices. Quantities contribute to
+the snack subtotal in the final bill. Selections are not persisted or attached to
+a booking record.
+
+## Apply a promo code and review the bill
+
+After snack selection, CineCLI accepts one optional promo code:
+
+- `CS2103` applies 20% off the complete ticket-and-snack subtotal.
+- `CS3227` applies 99% off the complete ticket-and-snack subtotal.
+
+Promo codes are case-insensitive, and surrounding whitespace is ignored. Press
+ENTER on a blank line to skip the promotion. A nonblank unsupported code is
+rejected and the same prompt is shown again. Only one code can be applied; promo
+codes cannot be stacked.
+
+CineCLI then displays every ticket and snack selection, separate ticket and snack
+subtotals, the pre-discount subtotal, any promotion and discount, and the payable
+total. For example:
+
+```text
+Bill Summary
+Tickets:
+- G4: Adult - S$11.00
+- G5: Senior - S$4.50
+Ticket subtotal: S$15.50
+Snacks and Combos:
+- 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each
+- 3 x Nachos - S$6.00 each
+Snack subtotal: S$32.00
+Subtotal: S$47.50
+Promo code: CS2103 (20% off)
+Discount: -S$9.50
+Total: S$38.00
+```
+
+All calculations use exact Singapore cents. If applying a percentage produces a
+fraction of a cent, the final payable total is rounded to the nearest cent, with a
+half cent rounded up. For example, `CS3227` reduces a S$4.50 Senior ticket to
+S$0.05. CineCLI displays the bill but does not process payment.
 
 ## Runtime data
 
@@ -132,7 +187,8 @@ as an empty, versioned seat occupancy file. Confirmed selections are stored by
 screening ID and seat coordinate. This file is temporary and will be replaced by
 booking-owned seat allocations when booking persistence is implemented.
 
-Snack and combo choices do not create or update a runtime data file.
+Ticket assignments, snack and combo choices, promo codes, and bills do not create
+or update a runtime data file.
 
 If either runtime file is malformed, CineCLI displays a clear error and does not
 use partial or invented data. A malformed file is not overwritten automatically.
