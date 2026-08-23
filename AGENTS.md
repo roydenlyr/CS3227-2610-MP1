@@ -49,6 +49,27 @@ conflicting rendered examples. Do not use tabs for Java indentation.
   persistence format, production dependencies, security, destructive operations,
   or an existing owner decision.
 
+## Git branching and commits
+
+- `master` is the stable integration and submission branch.
+- Perform substantial feature, fix, and refactoring work on short-lived branches
+  created from the latest approved `master`.
+- Scope branches to user-visible features or coherent engineering tasks, not to
+  individual classes or files.
+- Codex may create branches and local commits only when explicitly authorized as
+  part of a development task.
+- When local commits are authorized, commit each completed logical unit atomically.
+  Use a short, descriptive, imperative commit message.
+- Before committing, run the relevant automated tests and review the diff for
+  unrelated changes.
+- Never commit failing changes merely to make progress unless the owner explicitly
+  requests a work-in-progress commit.
+- Unless explicitly authorized by the owner, Codex must not push, merge into
+  `master`, rebase shared history, amend existing commits, force-push, delete
+  branches, or perform destructive Git operations.
+- After an approved committed task, leave the working tree clean and report the
+  resulting branch, commits, and verification performed.
+
 ## Design and implementation rules
 
 - Prefer the simplest maintainable design that satisfies approved requirements.
