@@ -3,7 +3,8 @@
 CineCLI is a Java command-line cinema kiosk and administration system under
 incremental development. The current milestone implements the customer welcome
 screen, a persisted movie catalog, screening selection, and a fixed terminal seat
-map with temporary persisted occupancy.
+map with temporary persisted occupancy, followed by an optional priced snack and
+combo selection.
 
 ## Prerequisite
 
@@ -41,14 +42,20 @@ java -jar target/cinecli-0.1.0-SNAPSHOT.jar
 
 The application displays `Press ENTER to proceed`. Press ENTER to load the movie
 catalog. Select a screening by combining its movie number and timing letter, such
-as `3B`. Select seats using coordinates such as `G4 G5`, then confirm with `Y`.
+as `3B`. Select seats using coordinates such as `G4 G5`, confirm with `Y`, then
+choose one snack or combo by its menu number or enter `0` to skip.
+
+The fixed menu offers Popcorn for S$5.00, Nachos for S$6.00, a Soft Drink for
+S$3.00, a Popcorn Combo for S$7.00, and a Nachos Combo for S$8.00. Snack and
+combo choices are session-only; quantities, checkout, and payment are not yet
+implemented.
 
 On first launch, a missing `data/runtime/catalog.tsv` is initialized from fictional
 defaults bundled inside the JAR. A missing `data/runtime/seats.tsv` is initialized
 when seat selection is first opened.
 
 Seat occupancy is a temporary source of truth until booking persistence is
-implemented. Administration, snacks, discounts, checkout, and complete booking
+implemented. Administration, discounts, checkout, payment, and complete booking
 records are not yet implemented.
 
 ## Documentation

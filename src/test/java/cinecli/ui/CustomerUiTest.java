@@ -8,6 +8,7 @@ import cinecli.model.ContentRating;
 import cinecli.model.Movie;
 import cinecli.model.Screening;
 import cinecli.model.SeatCoordinate;
+import cinecli.model.SnackMenuItem;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.LocalDateTime;
@@ -72,6 +73,42 @@ class CustomerUiTest {
                 () -> assertEquals("20", axisFields[19]),
                 () -> assertTrue(output.toString().contains(
                         "X = Taken or tentatively selected")));
+    }
+
+    @Test
+    void showSnackMenu_fixedItems_groupsItemsWithExactPrices() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.showSnackMenu(List.of(SnackMenuItem.values()));
+
+        List<String> nonblankLines = output.toString().lines()
+                .filter(line -> !line.isBlank())
+                .toList();
+        assertEquals(
+                List.of(
+                        "Snack and Combo Menu",
+                        "Snacks:",
+                        "1. Popcorn - S$5.00",
+                        "2. Nachos - S$6.00",
+                        "3. Soft Drink - S$3.00",
+                        "Combos:",
+                        "4. Popcorn Combo (Popcorn + Soft Drink) - S$7.00",
+                        "5. Nachos Combo (Nachos + Soft Drink) - S$8.00",
+                        "0. Skip snacks and combos"),
+                nonblankLines);
+    }
+
+    @Test
+    void showSnackSelected_combo_displaysNameAndExactPrice() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.showSnackSelected(SnackMenuItem.NACHOS_COMBO);
+
+        assertEquals(
+                "Snack/combo selected: Nachos Combo (Nachos + Soft Drink) - S$8.00",
+                output.toString().strip());
     }
 
     private CustomerUi createUi(StringWriter output) {

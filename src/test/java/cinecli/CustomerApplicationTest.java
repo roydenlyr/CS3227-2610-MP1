@@ -77,7 +77,7 @@ class CustomerApplicationTest {
     }
 
     @Test
-    void run_validScreeningAndSeats_rendersTentativeSeatsAndPersistsConfirmation()
+    void run_validScreeningSeatsAndCombo_completesPostSeatSelectionFlow()
             throws IOException {
         String catalog = """
                 CINECLI-CATALOG\t1
@@ -90,21 +90,26 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n3b\ng4 g5\ny\n");
+                catalog, null, "\n3b\ng4 g5\ny\n4\n");
 
         String persistedSeats = Files.readString(applicationOutput.runtimeSeats(), UTF_8);
+        String normalOutput = applicationOutput.normalOutput();
         List<String> rowGStates = applicationOutput.normalOutput().lines()
                 .filter(line -> line.startsWith("G   "))
                 .toList();
+        int seatsConfirmedIndex = normalOutput.indexOf("Seats confirmed: G4, G5");
+        int snackMenuIndex = normalOutput.indexOf("Snack and Combo Menu");
+        int comboSelectedIndex = normalOutput.indexOf(
+                "Snack/combo selected: Popcorn Combo (Popcorn + Soft Drink) - S$7.00");
         assertAll(
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "B. 12 Oct 2026, 18:30")),
-                () -> assertTrue(applicationOutput.normalOutput().contains("Movie: Third Film")),
-                () -> assertTrue(applicationOutput.normalOutput().contains("SCREEN")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
+                () -> assertTrue(normalOutput.contains("B. 12 Oct 2026, 18:30")),
+                () -> assertTrue(normalOutput.contains("Movie: Third Film")),
+                () -> assertTrue(normalOutput.contains("SCREEN")),
+                () -> assertTrue(normalOutput.contains(
                         "Confirm seats G4, G5? (Y/N):")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Seats confirmed: G4, G5")),
+                () -> assertTrue(seatsConfirmedIndex >= 0),
+                () -> assertTrue(snackMenuIndex > seatsConfirmedIndex),
+                () -> assertTrue(comboSelectedIndex > snackMenuIndex),
                 () -> assertEquals(2, rowGStates.size()),
                 () -> assertEquals("O", rowGStates.get(0).strip().split("\\s+")[4]),
                 () -> assertEquals("X", rowGStates.get(1).strip().split("\\s+")[4]),
@@ -113,6 +118,50 @@ class CustomerApplicationTest {
                                 + "TAKEN_SEAT\tSCR-003-B\tG4\n"
                                 + "TAKEN_SEAT\tSCR-003-B\tG5\n",
                         persistedSeats),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_skipSnackSelection_completesWithoutChoosingItem() throws IOException {
+        String catalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-001\tFirst Film\tPG13
+                SCREENING\tSCR-001\tMOV-001\t2026-10-10\t10:00
+                """;
+
+        ApplicationOutput applicationOutput = runWithData(
+                catalog, null, "\n1A\nA1\nY\n0\n");
+
+        assertAll(
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "Snack and Combo Menu")),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "No snacks or combos selected.")),
+                () -> assertFalse(applicationOutput.normalOutput().contains(
+                        "Snack/combo selected:")),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_invalidSnackSelections_repromptsUntilSnackSelected() throws IOException {
+        String catalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-001\tFirst Film\tPG13
+                SCREENING\tSCR-001\tMOV-001\t2026-10-10\t10:00
+                """;
+
+        ApplicationOutput applicationOutput = runWithData(
+                catalog, null, "\n1A\nA1\nY\ntwo\n6\n2\n");
+
+        List<String> snackErrors = applicationOutput.normalOutput().lines()
+                .filter(line -> line.startsWith("Invalid snack selection:"))
+                .toList();
+        assertAll(
+                () -> assertEquals(2, snackErrors.size()),
+                () -> assertTrue(snackErrors.stream().allMatch(line -> line.contains(
+                        "selection must be an item number from 1 through 5"))),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "Snack/combo selected: Nachos - S$6.00")),
                 () -> assertEquals("", applicationOutput.errorOutput()));
     }
 
@@ -159,6 +208,8 @@ class CustomerApplicationTest {
                         "Confirm seats G4? (Y/N):")),
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "Tentative seat selection cleared.")),
+                () -> assertFalse(applicationOutput.normalOutput().contains(
+                        "Snack and Combo Menu")),
                 () -> assertEquals(
                         "CINECLI-SEATS\t1\n",
                         Files.readString(applicationOutput.runtimeSeats(), UTF_8)),

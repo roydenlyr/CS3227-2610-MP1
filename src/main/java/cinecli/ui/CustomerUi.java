@@ -4,6 +4,7 @@ import cinecli.model.Movie;
 import cinecli.model.Screening;
 import cinecli.model.ScreeningSelection;
 import cinecli.model.SeatCoordinate;
+import cinecli.model.SnackMenuItem;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -17,7 +18,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Displays the customer catalog and seat-selection workflow.
+ * Displays the customer catalog, seat-selection, and snack-selection workflow.
  */
 public final class CustomerUi {
     private static final DateTimeFormatter SCREENING_TIME_FORMATTER =
@@ -171,6 +172,56 @@ public final class CustomerUi {
     }
 
     /**
+     * Shows the fixed snack and combo menu.
+     *
+     * @param menuItems Snack and combo items in display order.
+     */
+    public void showSnackMenu(List<SnackMenuItem> menuItems) {
+        Objects.requireNonNull(menuItems);
+        output.println();
+        output.println("Snack and Combo Menu");
+        showSnackMenuSection("Snacks", menuItems, false);
+        showSnackMenuSection("Combos", menuItems, true);
+        output.println("0. Skip snacks and combos");
+    }
+
+    /**
+     * Requests one snack or combo menu number from the user.
+     *
+     * @return Submitted menu number, or null if input ended or could not be read.
+     */
+    public String requestSnackSelection() {
+        output.println("Choose one item by number, or enter 0 to skip:");
+        return readLine();
+    }
+
+    /**
+     * Shows why a snack or combo selection was rejected.
+     *
+     * @param message Rejection explanation.
+     */
+    public void showSnackSelectionError(String message) {
+        output.println("Invalid snack selection: " + message);
+    }
+
+    /**
+     * Shows the selected snack or combo and its price.
+     *
+     * @param menuItem Selected menu item.
+     */
+    public void showSnackSelected(SnackMenuItem menuItem) {
+        Objects.requireNonNull(menuItem);
+        output.println("Snack/combo selected: " + formatSnackMenuItem(menuItem));
+    }
+
+    /**
+     * Shows that the customer skipped the optional snack and combo menu.
+     */
+    public void showSnackSelectionSkipped() {
+        output.println("No snacks or combos selected.");
+    }
+
+    /**
      * Shows that the selected screening has no available seats.
      */
     public void showNoSeatsAvailable() {
@@ -262,6 +313,25 @@ public final class CustomerUi {
                 .sorted()
                 .map(SeatCoordinate::toString)
                 .collect(Collectors.joining(", "));
+    }
+
+    private void showSnackMenuSection(
+            String heading, List<SnackMenuItem> menuItems, boolean isCombo) {
+        output.println(heading + ":");
+        for (SnackMenuItem menuItem : menuItems) {
+            if (menuItem.isCombo() == isCombo) {
+                output.println(menuItem.getMenuNumber() + ". " + formatSnackMenuItem(menuItem));
+            }
+        }
+    }
+
+    private String formatSnackMenuItem(SnackMenuItem menuItem) {
+        return menuItem.getDisplayName() + " - " + formatPrice(menuItem.getPriceInCents());
+    }
+
+    private String formatPrice(int priceInCents) {
+        return String.format(
+                Locale.ROOT, "S$%d.%02d", priceInCents / 100, priceInCents % 100);
     }
 
     private String readLine() {

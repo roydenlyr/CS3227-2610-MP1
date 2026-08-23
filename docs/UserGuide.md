@@ -3,12 +3,14 @@
 ## Project status
 
 CineCLI currently provides a customer workflow from the welcome screen to the
-movie catalog, screening selection, and terminal seat selection. Each movie
-displays its content rating and lettered screening dates and times.
+movie catalog, screening selection, terminal seat selection, and an optional
+snack or combo choice. Each movie displays its content rating and lettered
+screening dates and times.
 
 Seat occupancy is stored temporarily until booking records become the source of
-truth. Administration, snacks, discounts, checkout, and complete booking records
-are not part of this milestone.
+truth. Snack and combo choices are session-only. Administration, quantities,
+discounts, checkout, payment, and complete booking records are not part of this
+milestone.
 
 ## Prerequisite
 
@@ -86,6 +88,29 @@ available.`
 Confirmed selections remain `X` on later runs. CineCLI rejects malformed,
 duplicate, or already-taken coordinates and asks for another selection.
 
+## Choose a snack or combo
+
+After CineCLI successfully confirms the seats, it displays this fixed menu:
+
+```text
+Snack and Combo Menu
+Snacks:
+1. Popcorn - S$5.00
+2. Nachos - S$6.00
+3. Soft Drink - S$3.00
+Combos:
+4. Popcorn Combo (Popcorn + Soft Drink) - S$7.00
+5. Nachos Combo (Nachos + Soft Drink) - S$8.00
+0. Skip snacks and combos
+```
+
+Enter one item number from `1` through `5`, or enter `0` to continue without a
+snack or combo. CineCLI rejects malformed or unavailable item numbers and asks
+again. A valid choice is acknowledged with its exact price.
+
+This milestone supports one optional choice per run. The choice is not persisted
+and is not yet included in a booking, total, checkout, or payment flow.
+
 ## Runtime data
 
 On first launch from a working directory without `data/runtime/catalog.tsv`,
@@ -96,6 +121,8 @@ When seat selection is first opened, a missing `data/runtime/seats.tsv` is creat
 as an empty, versioned seat occupancy file. Confirmed selections are stored by
 screening ID and seat coordinate. This file is temporary and will be replaced by
 booking-owned seat allocations when booking persistence is implemented.
+
+Snack and combo choices do not create or update a runtime data file.
 
 If either runtime file is malformed, CineCLI displays a clear error and does not
 use partial or invented data. A malformed file is not overwritten automatically.

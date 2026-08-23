@@ -3,9 +3,10 @@
 ## Project status
 
 This repository implements a customer vertical slice from the welcome screen to
-catalog display, screening selection, and terminal seat selection. Catalog and
-temporary seat occupancy data are strictly validated and persisted as versioned
-plain text. Other customer and administration features remain deferred.
+catalog display, screening selection, terminal seat selection, and an optional
+priced snack or combo choice. Catalog and temporary seat occupancy data are
+strictly validated and persisted as versioned plain text. Snack choices remain
+session-only, and other customer and administration features remain deferred.
 
 ## Toolchain
 
@@ -53,11 +54,11 @@ The implemented responsibilities are intentionally small:
 
 - `Main` wires UTF-8 system streams, runtime paths, the UI, and storage.
 - `CustomerApplication` coordinates catalog selection, seat-selection rules,
-  confirmation, and graceful storage failure.
+  confirmation, snack selection, and graceful storage failure.
 - `CustomerUi` owns customer-facing input prompts and output formatting, including
-  the fixed terminal seat map.
-- `Movie`, `Screening`, `ContentRating`, `ScreeningSelection`, and `SeatCoordinate`
-  represent immutable domain and selection data.
+  the fixed terminal seat map and snack menu.
+- `Movie`, `Screening`, `ContentRating`, `ScreeningSelection`, `SeatCoordinate`,
+  and `SnackMenuItem` represent immutable domain and selection data.
 - `CatalogStorage` initializes missing runtime data and reads the file.
 - `CatalogParser` strictly parses and validates the versioned text format before
   returning any movies.
@@ -66,16 +67,18 @@ The implemented responsibilities are intentionally small:
 - `SeatParser` strictly validates all temporary occupancy records before any seat
   state is returned or updated.
 
-No persistence interface, administration layer, or production dependency has been
-introduced. The temporary seat writer is intentionally isolated so booking-owned
-seat allocations can replace it without changing the terminal map.
+No snack persistence, persistence interface, administration layer, or production
+dependency has been introduced. The temporary seat writer is intentionally
+isolated so booking-owned seat allocations can replace it without changing the
+terminal map.
 
 ## Testing
 
 JUnit tests use injected readers, writers, and temporary directories. They cover
-the welcome-to-seat-confirmation workflow, screening code parsing, exact seat-map
+the welcome-to-snack-selection workflow, screening code parsing, exact seat-map
 orientation, tentative selection, confirmation and cancellation, occupied-seat
-rejection, strict catalog and seat validation, deterministic seat writes, and
+rejection, the exact snack menu and prices, snack selection and skipping, invalid
+snack retries, strict catalog and seat validation, deterministic seat writes, and
 missing-file initialization. Tests never read or write the real `data/runtime`
 directory.
 
@@ -94,6 +97,13 @@ Every screening uses the same 7-by-20 layout. The UI renders `SCREEN` above row
 Previously taken seats and tentative session selections both render as `X`.
 Tentative seats are written only after the user confirms them with `Y`; declining
 clears them and returns to the original persisted map.
+
+After seat persistence succeeds, the application displays a fixed in-memory menu
+of three individual items and two combos. Menu numbers are parsed by
+`SnackMenuItem`; exact prices are stored as Singapore cents and formatted by the
+UI with two decimal places. The customer can select one item or enter `0` to skip.
+The application retries malformed and out-of-range choices. No snack menu is shown
+when seat selection is cancelled, incomplete, unavailable, or fails to persist.
 
 ## Persistence
 
@@ -137,5 +147,9 @@ locking is deliberately deferred because only one CineCLI process is expected.
 This occupancy file is transitional. Once booking persistence is implemented,
 bookings will own seat allocations and availability will be derived from those
 allocations rather than duplicated here.
+
+Snack and combo selections remain in memory only. No snack schema was added; a
+future booking or checkout requirement must define how such choices, quantities,
+and totals are represented before persistence is introduced.
 
 The detailed data policy is recorded in `data/README.md`.
