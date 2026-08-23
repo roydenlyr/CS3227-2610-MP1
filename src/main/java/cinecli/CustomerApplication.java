@@ -5,14 +5,17 @@ import cinecli.model.Screening;
 import cinecli.model.ScreeningSelection;
 import cinecli.model.SeatCoordinate;
 import cinecli.model.SnackMenuItem;
+import cinecli.model.SnackSelection;
 import cinecli.storage.CatalogStorage;
 import cinecli.storage.CatalogStorageException;
 import cinecli.storage.SeatStorage;
 import cinecli.storage.SeatStorageException;
 import cinecli.ui.CustomerUi;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -174,22 +177,51 @@ public final class CustomerApplication {
 
     private void runSnackSelection() {
         customerUi.showSnackMenu(SNACK_MENU_ITEMS);
+        Map<SnackMenuItem, SnackSelection> selections = new LinkedHashMap<>();
         while (true) {
             String input = customerUi.requestSnackSelection();
             if (input == null) {
                 return;
             }
             if (input.strip().equals("0")) {
-                customerUi.showSnackSelectionSkipped();
+                if (selections.isEmpty()) {
+                    customerUi.showSnackSelectionSkipped();
+                } else {
+                    customerUi.showSnackSelections(List.copyOf(selections.values()));
+                }
                 return;
             }
 
             try {
                 SnackMenuItem menuItem = SnackMenuItem.parse(input);
-                customerUi.showSnackSelected(menuItem);
-                return;
+                SnackSelection selection = requestSnackQuantity(menuItem);
+                if (selection == null) {
+                    return;
+                }
+
+                boolean isUpdated = selections.put(menuItem, selection) != null;
+                if (isUpdated) {
+                    customerUi.showSnackSelectionUpdated(selection);
+                } else {
+                    customerUi.showSnackSelectionAdded(selection);
+                }
             } catch (IllegalArgumentException exception) {
                 customerUi.showSnackSelectionError(exception.getMessage());
+            }
+        }
+    }
+
+    private SnackSelection requestSnackQuantity(SnackMenuItem menuItem) {
+        while (true) {
+            String input = customerUi.requestSnackQuantity(menuItem);
+            if (input == null) {
+                return null;
+            }
+
+            try {
+                return new SnackSelection(menuItem, SnackSelection.parseQuantity(input));
+            } catch (IllegalArgumentException exception) {
+                customerUi.showSnackQuantityError(exception.getMessage());
             }
         }
     }

@@ -9,6 +9,7 @@ import cinecli.model.Movie;
 import cinecli.model.Screening;
 import cinecli.model.SeatCoordinate;
 import cinecli.model.SnackMenuItem;
+import cinecli.model.SnackSelection;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.LocalDateTime;
@@ -95,20 +96,53 @@ class CustomerUiTest {
                         "Combos:",
                         "4. Popcorn Combo (Popcorn + Soft Drink) - S$7.00",
                         "5. Nachos Combo (Nachos + Soft Drink) - S$8.00",
-                        "0. Skip snacks and combos"),
+                        "0. Finish selection (or skip if none selected)"),
                 nonblankLines);
     }
 
     @Test
-    void showSnackSelected_combo_displaysNameAndExactPrice() {
+    void requestSnackQuantity_combo_displaysItemName() {
         StringWriter output = new StringWriter();
         CustomerUi customerUi = createUi(output);
 
-        customerUi.showSnackSelected(SnackMenuItem.NACHOS_COMBO);
+        customerUi.requestSnackQuantity(SnackMenuItem.NACHOS_COMBO);
 
         assertEquals(
-                "Snack/combo selected: Nachos Combo (Nachos + Soft Drink) - S$8.00",
+                "Enter quantity for Nachos Combo (Nachos + Soft Drink) (positive whole number):",
                 output.toString().strip());
+    }
+
+    @Test
+    void showSnackSelectionAdded_combo_displaysQuantityAndUnitPrice() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.showSnackSelectionAdded(
+                new SnackSelection(SnackMenuItem.NACHOS_COMBO, 2));
+
+        assertEquals(
+                "Snack/combo added: 2 x Nachos Combo (Nachos + Soft Drink) - S$8.00 each",
+                output.toString().strip());
+    }
+
+    @Test
+    void showSnackSelections_multipleItems_displaysOriginalOrderAndUnitPrices() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.showSnackSelections(List.of(
+                new SnackSelection(SnackMenuItem.POPCORN_COMBO, 2),
+                new SnackSelection(SnackMenuItem.NACHOS, 3)));
+
+        List<String> nonblankLines = output.toString().lines()
+                .filter(line -> !line.isBlank())
+                .toList();
+        assertEquals(
+                List.of(
+                        "Selected Snacks and Combos",
+                        "- 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each",
+                        "- 3 x Nachos - S$6.00 each"),
+                nonblankLines);
     }
 
     private CustomerUi createUi(StringWriter output) {

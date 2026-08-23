@@ -15,6 +15,9 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -77,7 +80,7 @@ class CustomerApplicationTest {
     }
 
     @Test
-    void run_validScreeningSeatsAndCombo_completesPostSeatSelectionFlow()
+    void run_validScreeningSeatsAndMultipleItems_completesPostSeatSelectionFlow()
             throws IOException {
         String catalog = """
                 CINECLI-CATALOG\t1
@@ -90,7 +93,7 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n3b\ng4 g5\ny\n4\n");
+                catalog, null, "\n3b\ng4 g5\ny\n4\n2\n2\n3\n0\n");
 
         String persistedSeats = Files.readString(applicationOutput.runtimeSeats(), UTF_8);
         String normalOutput = applicationOutput.normalOutput();
@@ -99,8 +102,11 @@ class CustomerApplicationTest {
                 .toList();
         int seatsConfirmedIndex = normalOutput.indexOf("Seats confirmed: G4, G5");
         int snackMenuIndex = normalOutput.indexOf("Snack and Combo Menu");
-        int comboSelectedIndex = normalOutput.indexOf(
-                "Snack/combo selected: Popcorn Combo (Popcorn + Soft Drink) - S$7.00");
+        int comboAddedIndex = normalOutput.indexOf(
+                "Snack/combo added: 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each");
+        int snackAddedIndex = normalOutput.indexOf(
+                "Snack/combo added: 3 x Nachos - S$6.00 each");
+        int selectionsIndex = normalOutput.indexOf("Selected Snacks and Combos");
         assertAll(
                 () -> assertTrue(normalOutput.contains("B. 12 Oct 2026, 18:30")),
                 () -> assertTrue(normalOutput.contains("Movie: Third Film")),
@@ -109,7 +115,13 @@ class CustomerApplicationTest {
                         "Confirm seats G4, G5? (Y/N):")),
                 () -> assertTrue(seatsConfirmedIndex >= 0),
                 () -> assertTrue(snackMenuIndex > seatsConfirmedIndex),
-                () -> assertTrue(comboSelectedIndex > snackMenuIndex),
+                () -> assertTrue(comboAddedIndex > snackMenuIndex),
+                () -> assertTrue(snackAddedIndex > comboAddedIndex),
+                () -> assertTrue(selectionsIndex > snackAddedIndex),
+                () -> assertTrue(normalOutput.contains(
+                        "- 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each")),
+                () -> assertTrue(normalOutput.contains("- 3 x Nachos - S$6.00 each")),
+                () -> assertFalse(normalOutput.contains("Total:")),
                 () -> assertEquals(2, rowGStates.size()),
                 () -> assertEquals("O", rowGStates.get(0).strip().split("\\s+")[4]),
                 () -> assertEquals("X", rowGStates.get(1).strip().split("\\s+")[4]),
@@ -138,7 +150,7 @@ class CustomerApplicationTest {
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "No snacks or combos selected.")),
                 () -> assertFalse(applicationOutput.normalOutput().contains(
-                        "Snack/combo selected:")),
+                        "Snack/combo added:")),
                 () -> assertEquals("", applicationOutput.errorOutput()));
     }
 
@@ -151,7 +163,7 @@ class CustomerApplicationTest {
                 """;
 
         ApplicationOutput applicationOutput = runWithData(
-                catalog, null, "\n1A\nA1\nY\ntwo\n6\n2\n");
+                catalog, null, "\n1A\nA1\nY\ntwo\n6\n2\n3\n0\n");
 
         List<String> snackErrors = applicationOutput.normalOutput().lines()
                 .filter(line -> line.startsWith("Invalid snack selection:"))
@@ -161,8 +173,113 @@ class CustomerApplicationTest {
                 () -> assertTrue(snackErrors.stream().allMatch(line -> line.contains(
                         "selection must be an item number from 1 through 5"))),
                 () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Snack/combo selected: Nachos - S$6.00")),
+                        "- 3 x Nachos - S$6.00 each")),
                 () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_repeatedSnackSelection_replacesEarlierQuantity() throws IOException {
+        String catalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-001\tFirst Film\tPG13
+                SCREENING\tSCR-001\tMOV-001\t2026-10-10\t10:00
+                """;
+
+        ApplicationOutput applicationOutput = runWithData(
+                catalog, null, "\n1A\nA1\nY\n1\n2\n1\n5\n0\n");
+
+        List<String> summaryLines = applicationOutput.normalOutput().lines()
+                .filter(line -> line.startsWith("- "))
+                .toList();
+        assertAll(
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "Snack/combo added: 2 x Popcorn - S$5.00 each")),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "Snack/combo updated: 5 x Popcorn - S$5.00 each")),
+                () -> assertEquals(List.of("- 5 x Popcorn - S$5.00 each"), summaryLines),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_malformedSnackQuantities_repromptsForSameItem() throws IOException {
+        String catalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-001\tFirst Film\tPG13
+                SCREENING\tSCR-001\tMOV-001\t2026-10-10\t10:00
+                """;
+
+        ApplicationOutput applicationOutput = runWithData(
+                catalog, null, "\n1A\nA1\nY\n1\n\ntwo\n1.5\n2147483648\n2\n0\n");
+
+        List<String> quantityErrors = applicationOutput.normalOutput().lines()
+                .filter(line -> line.startsWith("Invalid snack quantity:"))
+                .toList();
+        long quantityPromptCount = applicationOutput.normalOutput().lines()
+                .filter(line -> line.equals(
+                        "Enter quantity for Popcorn (positive whole number):"))
+                .count();
+        assertAll(
+                () -> assertEquals(4, quantityErrors.size()),
+                () -> assertTrue(quantityErrors.stream().allMatch(line -> line.contains(
+                        "quantity must be a whole number from 1 through 2147483647"))),
+                () -> assertEquals(5, quantityPromptCount),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "- 2 x Popcorn - S$5.00 each")),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_nonPositiveSnackQuantities_repromptsForSameItem() throws IOException {
+        String catalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-001\tFirst Film\tPG13
+                SCREENING\tSCR-001\tMOV-001\t2026-10-10\t10:00
+                """;
+
+        ApplicationOutput applicationOutput = runWithData(
+                catalog, null, "\n1A\nA1\nY\n1\n0\n-1\n1\n0\n");
+
+        List<String> quantityErrors = applicationOutput.normalOutput().lines()
+                .filter(line -> line.startsWith("Invalid snack quantity:"))
+                .toList();
+        assertAll(
+                () -> assertEquals(2, quantityErrors.size()),
+                () -> assertTrue(quantityErrors.stream().allMatch(line -> line.contains(
+                        "quantity must be a whole number from 1 through 2147483647"))),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "- 1 x Popcorn - S$5.00 each")),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_newSession_doesNotRetainSnackSelectionsOrCreateSnackData() throws IOException {
+        String catalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-001\tFirst Film\tPG13
+                SCREENING\tSCR-001\tMOV-001\t2026-10-10\t10:00
+                """;
+
+        ApplicationOutput firstRun = runWithData(
+                catalog, null, "\n1A\nA1\nY\n3\n2\n0\n");
+        ApplicationOutput secondRun = runWithData(
+                catalog, null, "\n1A\nA2\nY\n0\n");
+        Set<String> runtimeFileNames;
+        try (Stream<Path> runtimeFiles = Files.list(tempDirectory)) {
+            runtimeFileNames = runtimeFiles
+                    .map(path -> path.getFileName().toString())
+                    .collect(Collectors.toSet());
+        }
+
+        assertAll(
+                () -> assertTrue(firstRun.normalOutput().contains(
+                        "- 2 x Soft Drink - S$3.00 each")),
+                () -> assertTrue(secondRun.normalOutput().contains(
+                        "No snacks or combos selected.")),
+                () -> assertFalse(secondRun.normalOutput().contains(
+                        "- 2 x Soft Drink - S$3.00 each")),
+                () -> assertEquals(Set.of("catalog.tsv", "seats.tsv"), runtimeFileNames),
+                () -> assertEquals("", firstRun.errorOutput()),
+                () -> assertEquals("", secondRun.errorOutput()));
     }
 
     @Test

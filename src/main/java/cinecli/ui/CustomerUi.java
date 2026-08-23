@@ -5,6 +5,7 @@ import cinecli.model.Screening;
 import cinecli.model.ScreeningSelection;
 import cinecli.model.SeatCoordinate;
 import cinecli.model.SnackMenuItem;
+import cinecli.model.SnackSelection;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -182,16 +183,29 @@ public final class CustomerUi {
         output.println("Snack and Combo Menu");
         showSnackMenuSection("Snacks", menuItems, false);
         showSnackMenuSection("Combos", menuItems, true);
-        output.println("0. Skip snacks and combos");
+        output.println("0. Finish selection (or skip if none selected)");
     }
 
     /**
-     * Requests one snack or combo menu number from the user.
+     * Requests a snack or combo menu number from the user.
      *
      * @return Submitted menu number, or null if input ended or could not be read.
      */
     public String requestSnackSelection() {
-        output.println("Choose one item by number, or enter 0 to skip:");
+        output.println("Choose an item by number, or enter 0 to finish:");
+        return readLine();
+    }
+
+    /**
+     * Requests the quantity of a snack or combo.
+     *
+     * @param menuItem Menu item whose quantity is requested.
+     * @return Submitted quantity, or null if input ended or could not be read.
+     */
+    public String requestSnackQuantity(SnackMenuItem menuItem) {
+        Objects.requireNonNull(menuItem);
+        output.println("Enter quantity for " + menuItem.getDisplayName()
+                + " (positive whole number):");
         return readLine();
     }
 
@@ -205,13 +219,46 @@ public final class CustomerUi {
     }
 
     /**
-     * Shows the selected snack or combo and its price.
+     * Shows why a snack or combo quantity was rejected.
      *
-     * @param menuItem Selected menu item.
+     * @param message Rejection explanation.
      */
-    public void showSnackSelected(SnackMenuItem menuItem) {
-        Objects.requireNonNull(menuItem);
-        output.println("Snack/combo selected: " + formatSnackMenuItem(menuItem));
+    public void showSnackQuantityError(String message) {
+        output.println("Invalid snack quantity: " + message);
+    }
+
+    /**
+     * Shows a newly added snack or combo selection.
+     *
+     * @param selection Added selection.
+     */
+    public void showSnackSelectionAdded(SnackSelection selection) {
+        Objects.requireNonNull(selection);
+        output.println("Snack/combo added: " + formatSnackSelection(selection));
+    }
+
+    /**
+     * Shows an updated snack or combo selection.
+     *
+     * @param selection Updated selection.
+     */
+    public void showSnackSelectionUpdated(SnackSelection selection) {
+        Objects.requireNonNull(selection);
+        output.println("Snack/combo updated: " + formatSnackSelection(selection));
+    }
+
+    /**
+     * Shows all snack and combo selections in their original selection order.
+     *
+     * @param selections Completed selections.
+     */
+    public void showSnackSelections(List<SnackSelection> selections) {
+        Objects.requireNonNull(selections);
+        output.println();
+        output.println("Selected Snacks and Combos");
+        for (SnackSelection selection : selections) {
+            output.println("- " + formatSnackSelection(selection));
+        }
     }
 
     /**
@@ -327,6 +374,11 @@ public final class CustomerUi {
 
     private String formatSnackMenuItem(SnackMenuItem menuItem) {
         return menuItem.getDisplayName() + " - " + formatPrice(menuItem.getPriceInCents());
+    }
+
+    private String formatSnackSelection(SnackSelection selection) {
+        return selection.quantity() + " x " + selection.menuItem().getDisplayName()
+                + " - " + formatPrice(selection.menuItem().getPriceInCents()) + " each";
     }
 
     private String formatPrice(int priceInCents) {
