@@ -4,9 +4,10 @@
 
 This repository implements a customer vertical slice from the welcome screen to
 catalog display, screening selection, terminal seat selection, and an optional
-priced snack or combo choice. Catalog and temporary seat occupancy data are
-strictly validated and persisted as versioned plain text. Snack choices remain
-session-only, and other customer and administration features remain deferred.
+priced snack and combo selection with multiple items and quantities. Catalog and
+temporary seat occupancy data are strictly validated and persisted as versioned
+plain text. Snack selections remain session-only, and other customer and
+administration features remain deferred.
 
 ## Toolchain
 
@@ -58,7 +59,8 @@ The implemented responsibilities are intentionally small:
 - `CustomerUi` owns customer-facing input prompts and output formatting, including
   the fixed terminal seat map and snack menu.
 - `Movie`, `Screening`, `ContentRating`, `ScreeningSelection`, `SeatCoordinate`,
-  and `SnackMenuItem` represent immutable domain and selection data.
+  `SnackMenuItem`, and `SnackSelection` represent immutable domain and selection
+  data.
 - `CatalogStorage` initializes missing runtime data and reads the file.
 - `CatalogParser` strictly parses and validates the versioned text format before
   returning any movies.
@@ -77,10 +79,11 @@ terminal map.
 JUnit tests use injected readers, writers, and temporary directories. They cover
 the welcome-to-snack-selection workflow, screening code parsing, exact seat-map
 orientation, tentative selection, confirmation and cancellation, occupied-seat
-rejection, the exact snack menu and prices, snack selection and skipping, invalid
-snack retries, strict catalog and seat validation, deterministic seat writes, and
-missing-file initialization. Tests never read or write the real `data/runtime`
-directory.
+rejection, the exact snack menu and prices, multiple snack and combo choices,
+positive quantity boundaries, repeated-item replacement, skipping and completion,
+invalid item and quantity retries, session isolation, strict catalog and seat
+validation, deterministic seat writes, and missing-file initialization. Tests
+never read or write the real `data/runtime` directory.
 
 Run the complete build with `clean verify` before considering an implementation
 task complete. Also verify the bundled resource is present in the JAR and smoke-test
@@ -101,9 +104,17 @@ clears them and returns to the original persisted map.
 After seat persistence succeeds, the application displays a fixed in-memory menu
 of three individual items and two combos. Menu numbers are parsed by
 `SnackMenuItem`; exact prices are stored as Singapore cents and formatted by the
-UI with two decimal places. The customer can select one item or enter `0` to skip.
-The application retries malformed and out-of-range choices. No snack menu is shown
-when seat selection is cancelled, incomplete, unavailable, or fails to persist.
+UI with two decimal places. Each selected item is paired with a positive
+whole-number quantity in an immutable `SnackSelection`.
+
+The application keeps selections in original selection order and keys them by
+menu item. A customer can therefore add multiple a la carte items and combos, while
+selecting the same item again replaces its earlier quantity without creating a
+duplicate summary line. The item prompt repeats until the customer enters `0`;
+immediate `0` skips, while `0` after one or more selections displays a summary with
+unit prices. Malformed item numbers and quantities are retried at their respective
+prompts. No subtotal or total is calculated. No snack menu is shown when seat
+selection is cancelled, incomplete, unavailable, or fails to persist.
 
 ## Persistence
 
@@ -148,8 +159,8 @@ This occupancy file is transitional. Once booking persistence is implemented,
 bookings will own seat allocations and availability will be derived from those
 allocations rather than duplicated here.
 
-Snack and combo selections remain in memory only. No snack schema was added; a
-future booking or checkout requirement must define how such choices, quantities,
-and totals are represented before persistence is introduced.
+Snack and combo selections and quantities remain in memory only. No snack schema
+was added; a future booking or checkout requirement must define how these choices
+and any subtotals or totals are represented before persistence is introduced.
 
 The detailed data policy is recorded in `data/README.md`.

@@ -45,3 +45,15 @@ results belong in the corresponding task summary under `logs/`.
 - Keeping one optional snack or combo choice in memory satisfies the current
   interaction requirement without inventing quantities, totals, checkout rules,
   or a persistence schema before those requirements are approved.
+
+## 2026-08-23 - Multiple snack and combo quantities
+
+- The later quantity requirement intentionally supersedes the earlier single-choice
+  boundary while retaining the same fixed menu, prices, and session-only scope.
+- Pairing each item with a validated immutable quantity keeps malformed input out of
+  the selection state and gives the UI one clear value to format.
+- Keying selections by menu item lets customers correct a quantity by selecting the
+  item again, while insertion order keeps the final summary aligned with the order
+  in which different items were first chosen.
+- Separating the item prompt from the quantity prompt allows invalid quantities to
+  be retried without forcing customers to re-enter a valid item number.

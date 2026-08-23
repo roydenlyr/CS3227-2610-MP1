@@ -4,13 +4,13 @@
 
 CineCLI currently provides a customer workflow from the welcome screen to the
 movie catalog, screening selection, terminal seat selection, and an optional
-snack or combo choice. Each movie displays its content rating and lettered
-screening dates and times.
+snack and combo selection with quantities. Each movie displays its content rating
+and lettered screening dates and times.
 
 Seat occupancy is stored temporarily until booking records become the source of
-truth. Snack and combo choices are session-only. Administration, quantities,
-discounts, checkout, payment, and complete booking records are not part of this
-milestone.
+truth. Snack and combo choices and quantities are session-only. Administration,
+discounts, totals, checkout, payment, and complete booking records are not part of
+this milestone.
 
 ## Prerequisite
 
@@ -101,15 +101,25 @@ Snacks:
 Combos:
 4. Popcorn Combo (Popcorn + Soft Drink) - S$7.00
 5. Nachos Combo (Nachos + Soft Drink) - S$8.00
-0. Skip snacks and combos
+0. Finish selection (or skip if none selected)
 ```
 
-Enter one item number from `1` through `5`, or enter `0` to continue without a
-snack or combo. CineCLI rejects malformed or unavailable item numbers and asks
-again. A valid choice is acknowledged with its exact price.
+1. Enter an item number from `1` through `5`.
+2. Enter a positive whole-number quantity when prompted. CineCLI acknowledges the
+   item, quantity, and unit price.
+3. Repeat the item and quantity steps to choose more a la carte items or combos.
+4. Enter `0` at the item prompt to finish. CineCLI displays all selected items in
+   their original selection order. Entering `0` before adding an item skips snacks
+   and combos.
 
-This milestone supports one optional choice per run. The choice is not persisted
-and is not yet included in a booking, total, checkout, or payment flow.
+Choosing the same item again replaces its earlier quantity instead of creating a
+duplicate line. CineCLI rejects malformed or unavailable item numbers and asks for
+another item. It rejects zero, negative, fractional, nonnumeric, and out-of-range
+quantities, then asks again for the quantity of the same item.
+
+Selections are not persisted and are not yet included in a booking, total,
+checkout, or payment flow. Displayed prices are unit prices; CineCLI does not
+calculate line subtotals or an order total in this milestone.
 
 ## Runtime data
 
