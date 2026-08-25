@@ -151,30 +151,62 @@ ENTER on a blank line to skip the promotion. A nonblank unsupported code is
 rejected and the same prompt is shown again. Only one code can be applied; promo
 codes cannot be stacked.
 
-CineCLI then displays every ticket and snack selection, separate ticket and snack
-subtotals, the pre-discount subtotal, any promotion and discount, and the payable
-total. For example:
+CineCLI then displays a four-section bill. The ticket section identifies the movie
+and screening time before listing each seat, demographic ticket type, and unit
+price. The snack section lists each distinct selection, its quantity, and its unit
+price. Combo contents wrap onto an indented second line. The promotion section
+shows the applied code, discount percentage, and amount saved. The final section
+repeats the pre-discount subtotal and discount before the payable total. For
+example:
 
 ```text
-Bill Summary
-Tickets:
-- G4: Adult - S$11.00
-- G5: Senior - S$4.50
-Ticket subtotal: S$15.50
-Snacks and Combos:
-- 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each
-- 3 x Nachos - S$6.00 each
-Snack subtotal: S$32.00
-Subtotal: S$47.50
-Promo code: CS2103 (20% off)
-Discount: -S$9.50
-Total: S$38.00
+============================================================
+                        BILL SUMMARY
+============================================================
+
+TICKETS
+------------------------------------------------------------
+Movie: Orbit of Echoes
+Time: 29 Aug 2026, 13:30
+
+Seat        Type                                  Unit Price
+------------------------------------------------------------
+G4          Adult                                    S$11.00
+G5          Senior                                    S$4.50
+------------------------------------------------------------
+Ticket Subtotal:                                     S$15.50
+
+SNACKS AND COMBOS
+------------------------------------------------------------
+Qty         Item                                  Unit Price
+------------------------------------------------------------
+2           Popcorn Combo                             S$7.00
+            (Popcorn + Soft Drink)
+3           Nachos                                    S$6.00
+------------------------------------------------------------
+Snack Subtotal:                                      S$32.00
+
+PROMOTION
+------------------------------------------------------------
+Promo Code:                                           CS2103
+Discount:                                            20% OFF
+Amount Saved:                                        -S$9.50
+
+============================================================
+Subtotal:                                            S$47.50
+Discount:                                            -S$9.50
+------------------------------------------------------------
+TOTAL:                                               S$38.00
+============================================================
 ```
 
 All calculations use exact Singapore cents. If applying a percentage produces a
 fraction of a cent, the final payable total is rounded to the nearest cent, with a
 half cent rounded up. For example, `CS3227` reduces a S$4.50 Senior ticket to
-S$0.05. CineCLI displays the bill but does not process payment.
+S$0.05. Currency amounts use comma grouping when necessary. When no code is
+entered, the promotion section shows `None`, `0% OFF`, and `-S$0.00`. Discount
+values use a leading minus sign because they are adjustments subtracted from the
+subtotal. CineCLI displays the bill but does not process payment.
 
 ## Runtime data
 

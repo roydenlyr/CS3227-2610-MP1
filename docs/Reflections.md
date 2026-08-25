@@ -70,3 +70,15 @@ results belong in the corresponding task summary under `logs/`.
   a one-cent inconsistency when a percentage produces exactly half a cent.
 - A session-only bill satisfies the approved checkout behavior while preserving
   the existing persistence boundary until a booking schema is approved.
+
+## 2026-08-25 - Four-section bill summary
+
+- Passing the selected movie and screening to the final UI call keeps receipt
+  context available without making the arithmetic-focused `Bill` model depend on
+  catalog objects.
+- Small shared row-formatting helpers make a fixed-width CLI receipt easier to
+  review and test than scattered spacing literals.
+- Splitting combo names from their parenthesized contents preserves readable table
+  columns while retaining all item information from the menu.
+- Exact output tests are valuable when a visual example defines section rules,
+  alignment, capitalization, repeated totals, and large-number formatting.

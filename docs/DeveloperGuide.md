@@ -58,7 +58,7 @@ The implemented responsibilities are intentionally small:
   confirmation, ticket and snack selection, promo input, bill creation, and
   graceful storage failure.
 - `CustomerUi` owns customer-facing input prompts and output formatting, including
-  the fixed terminal seat map, menus, and itemized bill.
+  the fixed terminal seat map, menus, and four-section itemized bill.
 - `Movie`, `Screening`, `ContentRating`, `ScreeningSelection`, `SeatCoordinate`,
   `TicketType`, `TicketSelection`, `SnackMenuItem`, `SnackSelection`, `PromoCode`,
   and `Bill` represent immutable domain, selection, and billing data.
@@ -83,8 +83,10 @@ tentative selection, confirmation and cancellation, occupied-seat rejection,
 deterministic seat-to-ticket assignment, all ticket prices, ticket retries, the
 exact snack menu and prices, multiple snack and combo choices, quantity boundaries,
 repeated-item replacement, promo parsing and retries, aggregate discounts,
-half-cent rounding, checked long-cent arithmetic, session isolation, strict catalog
-and seat validation, deterministic seat writes, and missing-file initialization.
+half-cent rounding, checked long-cent arithmetic, exact receipt sections and
+columns, combo-description wrapping, grouped large currency amounts, session
+isolation, strict catalog and seat validation, deterministic seat writes, and
+missing-file initialization.
 Tests never read or write the real `data/runtime` directory.
 
 Run the complete build with `clean verify` before considering an implementation
@@ -137,6 +139,25 @@ final payable amount is rounded to the nearest cent with half cents rounded up;
 the discount shown is the exact difference between the pre-discount subtotal and
 that rounded payable amount. `CustomerUi` formats these domain results and does not
 implement monetary rules.
+
+`CustomerApplication` passes the selected `Movie` and `Screening` to the final UI
+call so receipt context does not become part of the arithmetic-focused `Bill`
+model. `CustomerUi` renders a 60-character-wide receipt with four sections:
+
+1. `TICKETS` shows movie title, screening date and time, seat, ticket type, unit
+   price, and ticket subtotal.
+2. `SNACKS AND COMBOS` shows each distinct selection in original selection order,
+   quantity, unit price, and snack subtotal. Parenthesized combo contents wrap
+   beneath the item name.
+3. `PROMOTION` shows the code or `None`, the discount percentage, and the amount
+   saved.
+4. The final totals block repeats the aggregate pre-discount subtotal and discount,
+   then ends with the payable total.
+
+Receipt tables and label-value rows are produced by shared formatting helpers so
+their columns remain consistent. Currency keeps exact two-decimal-cent output and
+adds comma grouping for large values. The amount saved and repeated discount are
+printed as negative adjustments, including `-S$0.00` when no promotion applies.
 
 ## Persistence
 

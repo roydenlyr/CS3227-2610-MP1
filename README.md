@@ -54,8 +54,10 @@ Adult tickets cost S$11.00, Senior tickets cost S$4.50, and Student tickets cost
 S$7.00. The fixed snack menu offers Popcorn for S$5.00, Nachos for S$6.00, a Soft
 Drink for S$3.00, a Popcorn Combo for S$7.00, and a Nachos Combo for S$8.00.
 `CS2103` discounts the complete ticket-and-snack subtotal by 20%; `CS3227`
-discounts it by 99%. The final bill shows ticket and snack subtotals, the applied
-discount, and the payable total.
+discounts it by 99%. The final fixed-width bill is split into ticket, snack,
+promotion, and final-total sections. It includes the selected movie and screening
+time, seat and ticket details, snack quantities and unit prices, the amount saved,
+and the payable total.
 
 On first launch, a missing `data/runtime/catalog.tsv` is initialized from fictional
 defaults bundled inside the JAR. A missing `data/runtime/seats.tsv` is initialized
