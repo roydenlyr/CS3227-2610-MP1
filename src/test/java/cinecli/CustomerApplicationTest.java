@@ -110,7 +110,7 @@ class CustomerApplicationTest {
                 "Snack/combo added: 3 x Nachos - S$6.00 each");
         int selectionsIndex = normalOutput.indexOf("Selected Snacks and Combos");
         int promoPromptIndex = normalOutput.indexOf("Enter a promo code");
-        int billIndex = normalOutput.indexOf("Bill Summary");
+        int billIndex = normalOutput.indexOf("BILL SUMMARY");
         assertAll(
                 () -> assertTrue(normalOutput.contains("B. 12 Oct 2026, 18:30")),
                 () -> assertTrue(normalOutput.contains("Movie: Third Film")),
@@ -135,12 +135,13 @@ class CustomerApplicationTest {
                 () -> assertTrue(normalOutput.contains(
                         "- 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each")),
                 () -> assertTrue(normalOutput.contains("- 3 x Nachos - S$6.00 each")),
-                () -> assertTrue(normalOutput.contains("Ticket subtotal: S$15.50")),
-                () -> assertTrue(normalOutput.contains("Snack subtotal: S$32.00")),
-                () -> assertTrue(normalOutput.contains("Subtotal: S$47.50")),
-                () -> assertTrue(normalOutput.contains("Promo code: CS2103 (20% off)")),
-                () -> assertTrue(normalOutput.contains("Discount: -S$9.50")),
-                () -> assertTrue(normalOutput.contains("Total: S$38.00")),
+                () -> assertTrue(hasBillLine(normalOutput, "Ticket Subtotal:", "S$15.50")),
+                () -> assertTrue(hasBillLine(normalOutput, "Snack Subtotal:", "S$32.00")),
+                () -> assertTrue(hasBillLine(normalOutput, "Subtotal:", "S$47.50")),
+                () -> assertTrue(hasBillLine(normalOutput, "Promo Code:", "CS2103")),
+                () -> assertTrue(hasBillLine(normalOutput, "Discount:", "20% OFF")),
+                () -> assertTrue(hasBillLine(normalOutput, "Amount Saved:", "-S$9.50")),
+                () -> assertTrue(hasBillLine(normalOutput, "TOTAL:", "S$38.00")),
                 () -> assertEquals(2, rowGStates.size()),
                 () -> assertEquals("O", rowGStates.get(0).strip().split("\\s+")[4]),
                 () -> assertEquals("X", rowGStates.get(1).strip().split("\\s+")[4]),
@@ -172,12 +173,12 @@ class CustomerApplicationTest {
                         "Snack/combo added:")),
                 () -> assertFalse(applicationOutput.normalOutput().contains(
                         "Invalid promo code:")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Snack subtotal: S$0.00")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Promo code: None")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Total: S$7.00")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "Snack Subtotal:", "S$0.00")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "Promo Code:", "None")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "TOTAL:", "S$7.00")),
                 () -> assertEquals("", applicationOutput.errorOutput()));
     }
 
@@ -225,7 +226,6 @@ class CustomerApplicationTest {
                         "Snack/combo updated: 5 x Popcorn - S$5.00 each")),
                 () -> assertEquals(
                         List.of(
-                                "- 5 x Popcorn - S$5.00 each",
                                 "- 5 x Popcorn - S$5.00 each"),
                         summaryLines),
                 () -> assertEquals("", applicationOutput.errorOutput()));
@@ -335,8 +335,8 @@ class CustomerApplicationTest {
                 () -> assertTrue(applicationOutput.normalOutput().contains("Seats confirmed: G5")),
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "- G5: Senior - S$4.50")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Total: S$4.50")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "TOTAL:", "S$4.50")),
                 () -> assertEquals(
                         "CINECLI-SEATS\t1\n"
                                 + "TAKEN_SEAT\tSCR-001\tG4\n"
@@ -368,7 +368,7 @@ class CustomerApplicationTest {
                 () -> assertFalse(applicationOutput.normalOutput().contains(
                         "Enter a promo code")),
                 () -> assertFalse(applicationOutput.normalOutput().contains(
-                        "Bill Summary")),
+                        "BILL SUMMARY")),
                 () -> assertEquals(
                         "CINECLI-SEATS\t1\n",
                         Files.readString(applicationOutput.runtimeSeats(), UTF_8)),
@@ -470,19 +470,26 @@ class CustomerApplicationTest {
                 () -> assertTrue(promoErrors.stream().allMatch(line -> line.contains(
                         "promo code must be CS2103 or CS3227"))),
                 () -> assertEquals(3, promoPromptCount),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Subtotal: S$4.50")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Promo code: CS3227 (99% off)")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Discount: -S$4.45")),
-                () -> assertTrue(applicationOutput.normalOutput().contains(
-                        "Total: S$0.05")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "Subtotal:", "S$4.50")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "Promo Code:", "CS3227")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "Discount:", "99% OFF")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "Amount Saved:", "-S$4.45")),
+                () -> assertTrue(hasBillLine(
+                        applicationOutput.normalOutput(), "TOTAL:", "S$0.05")),
                 () -> assertEquals("", applicationOutput.errorOutput()));
     }
 
     private ApplicationOutput runWithCatalog(String catalog) throws IOException {
         return runWithData(catalog, null, "\n");
+    }
+
+    private boolean hasBillLine(String output, String label, String value) {
+        return output.lines()
+                .anyMatch(line -> line.startsWith(label) && line.endsWith(value));
     }
 
     private ApplicationOutput runWithData(String catalog, String seats, String input)

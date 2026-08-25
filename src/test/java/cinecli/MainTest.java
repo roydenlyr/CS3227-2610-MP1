@@ -60,12 +60,17 @@ class MainTest {
                 () -> assertTrue(output.toString().contains("Snack and Combo Menu")),
                 () -> assertTrue(output.toString().contains(
                         "- 2 x Nachos Combo (Nachos + Soft Drink) - S$8.00 each")),
-                () -> assertTrue(output.toString().contains(
-                        "Promo code: CS3227 (99% off)")),
-                () -> assertTrue(output.toString().contains("Total: S$0.23")),
+                () -> assertTrue(hasBillLine(output.toString(), "Promo Code:", "CS3227")),
+                () -> assertTrue(hasBillLine(output.toString(), "Discount:", "99% OFF")),
+                () -> assertTrue(hasBillLine(output.toString(), "TOTAL:", "S$0.23")),
                 () -> assertEquals(
                         "CINECLI-SEATS\t1\nTAKEN_SEAT\tSCR-005\tA1\n",
                         Files.readString(runtimeSeats, UTF_8)),
                 () -> assertEquals("", errorOutput.toString()));
+    }
+
+    private boolean hasBillLine(String output, String label, String value) {
+        return output.lines()
+                .anyMatch(line -> line.startsWith(label) && line.endsWith(value));
     }
 }

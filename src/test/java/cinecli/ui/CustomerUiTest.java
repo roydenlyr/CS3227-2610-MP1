@@ -169,21 +169,39 @@ class CustomerUiTest {
                 .toList();
         assertEquals(
                 List.of(
-                        "Bill Summary",
-                        "Tickets:",
+                        "============================================================",
+                        "                        BILL SUMMARY",
+                        "============================================================",
+                        "TICKETS",
+                        "------------------------------------------------------------",
                         "Movie: Orbit of Echoes",
                         "Time: 29 Aug 2026, 13:30",
-                        "- G4: Adult - S$11.00",
-                        "- G5: Senior - S$4.50",
-                        "Ticket subtotal: S$15.50",
-                        "Snacks and Combos:",
-                        "- 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each",
-                        "- 3 x Nachos - S$6.00 each",
-                        "Snack subtotal: S$32.00",
-                        "Subtotal: S$47.50",
-                        "Promo code: CS2103 (20% off)",
-                        "Discount: -S$9.50",
-                        "Total: S$38.00"),
+                        "Seat        Type                                  Unit Price",
+                        "------------------------------------------------------------",
+                        "G4          Adult                                    S$11.00",
+                        "G5          Senior                                    S$4.50",
+                        "------------------------------------------------------------",
+                        "Ticket Subtotal:                                     S$15.50",
+                        "SNACKS AND COMBOS",
+                        "------------------------------------------------------------",
+                        "Qty         Item                                  Unit Price",
+                        "------------------------------------------------------------",
+                        "2           Popcorn Combo                             S$7.00",
+                        "            (Popcorn + Soft Drink)",
+                        "3           Nachos                                    S$6.00",
+                        "------------------------------------------------------------",
+                        "Snack Subtotal:                                      S$32.00",
+                        "PROMOTION",
+                        "------------------------------------------------------------",
+                        "Promo Code:                                           CS2103",
+                        "Discount:                                            20% OFF",
+                        "Amount Saved:                                        -S$9.50",
+                        "============================================================",
+                        "Subtotal:                                            S$47.50",
+                        "Discount:                                            -S$9.50",
+                        "------------------------------------------------------------",
+                        "TOTAL:                                               S$38.00",
+                        "============================================================"),
                 nonblankLines);
     }
 
@@ -201,9 +219,13 @@ class CustomerUiTest {
 
         assertAll(
                 () -> assertTrue(output.toString().contains(
-                        "Snack subtotal: S$17179869176.00")),
+                        "S$17,179,869,176.00")),
                 () -> assertTrue(output.toString().contains(
-                        "Total: S$17179869187.00")));
+                        "S$17,179,869,187.00")),
+                () -> assertTrue(output.toString().contains("Promo Code:")),
+                () -> assertTrue(output.toString().contains("None")),
+                () -> assertTrue(output.toString().contains("0% OFF")),
+                () -> assertTrue(output.toString().contains("-S$0.00")));
     }
 
     @Test

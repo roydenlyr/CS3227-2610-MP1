@@ -26,6 +26,12 @@ import java.util.stream.Collectors;
  * Displays the customer catalog, seat selection, ticket selection, and snack selection.
  */
 public final class CustomerUi {
+    private static final String BILL_TITLE = "BILL SUMMARY";
+    private static final int BILL_WIDTH = 60;
+    private static final int BILL_TITLE_END_COLUMN =
+            (BILL_WIDTH + BILL_TITLE.length()) / 2;
+    private static final String BILL_MAJOR_RULE = "=".repeat(BILL_WIDTH);
+    private static final String BILL_SECTION_RULE = "-".repeat(BILL_WIDTH);
     private static final DateTimeFormatter SCREENING_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMM uuuu, HH:mm", Locale.ENGLISH);
     private static final String NO_MOVIES_MESSAGE = "No movies are currently available.";
@@ -355,36 +361,109 @@ public final class CustomerUi {
         Objects.requireNonNull(bill);
         Objects.requireNonNull(movie);
         Objects.requireNonNull(screening);
+
+        showBillHeader();
+        showBillTickets(bill, movie, screening);
+        showBillSnacks(bill);
+        showBillPromotion(bill);
+        showBillTotals(bill);
+    }
+
+    private void showBillHeader() {
         output.println();
-        output.println("Bill Summary");
-        output.println("Tickets:");
+        output.println(BILL_MAJOR_RULE);
+        output.printf(Locale.ROOT, "%" + BILL_TITLE_END_COLUMN + "s%n", BILL_TITLE);
+        output.println(BILL_MAJOR_RULE);
+    }
+
+    private void showBillTickets(Bill bill, Movie movie, Screening screening) {
+        output.println();
+        output.println("TICKETS");
+        output.println(BILL_SECTION_RULE);
         output.println("Movie: " + movie.title());
         output.println("Time: " + screening.startsAt().format(SCREENING_TIME_FORMATTER));
+        output.println();
+        showBillTableRow("Seat", "Type", "Unit Price");
+        output.println(BILL_SECTION_RULE);
         for (TicketSelection selection : bill.ticketSelections()) {
-            output.println("- " + formatTicketSelection(selection));
+            TicketType ticketType = selection.ticketType();
+            showBillTableRow(
+                    selection.seat().toString(),
+                    ticketType.getDisplayName(),
+                    formatPrice(ticketType.getPriceInCents()));
         }
-        output.println("Ticket subtotal: " + formatPrice(bill.getTicketSubtotalInCents()));
+        output.println(BILL_SECTION_RULE);
+        showBillLabelValue(
+                "Ticket Subtotal:", formatPrice(bill.getTicketSubtotalInCents()));
+    }
 
-        output.println("Snacks and Combos:");
+    private void showBillSnacks(Bill bill) {
+        output.println();
+        output.println("SNACKS AND COMBOS");
+        output.println(BILL_SECTION_RULE);
+        showBillTableRow("Qty", "Item", "Unit Price");
+        output.println(BILL_SECTION_RULE);
         if (bill.snackSelections().isEmpty()) {
             output.println("None");
         } else {
             for (SnackSelection selection : bill.snackSelections()) {
-                output.println("- " + formatSnackSelection(selection));
+                showBillSnackSelection(selection);
             }
         }
-        output.println("Snack subtotal: " + formatPrice(bill.getSnackSubtotalInCents()));
-        output.println("Subtotal: " + formatPrice(bill.getSubtotalInCents()));
+        output.println(BILL_SECTION_RULE);
+        showBillLabelValue(
+                "Snack Subtotal:", formatPrice(bill.getSnackSubtotalInCents()));
+    }
 
+    private void showBillPromotion(Bill bill) {
+        output.println();
+        output.println("PROMOTION");
+        output.println(BILL_SECTION_RULE);
         if (bill.promoCode().isPresent()) {
             PromoCode promoCode = bill.promoCode().orElseThrow();
-            output.println("Promo code: " + promoCode.getCode()
-                    + " (" + promoCode.getDiscountPercentage() + "% off)");
-            output.println("Discount: -" + formatPrice(bill.getDiscountInCents()));
+            showBillLabelValue("Promo Code:", promoCode.getCode());
+            showBillLabelValue(
+                    "Discount:", promoCode.getDiscountPercentage() + "% OFF");
         } else {
-            output.println("Promo code: None");
+            showBillLabelValue("Promo Code:", "None");
+            showBillLabelValue("Discount:", "0% OFF");
         }
-        output.println("Total: " + formatPrice(bill.getTotalInCents()));
+        showBillLabelValue(
+                "Amount Saved:", "-" + formatPrice(bill.getDiscountInCents()));
+    }
+
+    private void showBillTotals(Bill bill) {
+        output.println();
+        output.println(BILL_MAJOR_RULE);
+        showBillLabelValue("Subtotal:", formatPrice(bill.getSubtotalInCents()));
+        showBillLabelValue("Discount:", "-" + formatPrice(bill.getDiscountInCents()));
+        output.println(BILL_SECTION_RULE);
+        showBillLabelValue("TOTAL:", formatPrice(bill.getTotalInCents()));
+        output.println(BILL_MAJOR_RULE);
+    }
+
+    private void showBillSnackSelection(SnackSelection selection) {
+        String displayName = selection.menuItem().getDisplayName();
+        int descriptionIndex = displayName.indexOf(" (");
+        String itemName = descriptionIndex < 0
+                ? displayName
+                : displayName.substring(0, descriptionIndex);
+        showBillTableRow(
+                Integer.toString(selection.quantity()),
+                itemName,
+                formatPrice(selection.menuItem().getPriceInCents()));
+        if (descriptionIndex >= 0) {
+            output.printf(Locale.ROOT, "%12s%s%n", "", displayName.substring(descriptionIndex + 1));
+        }
+    }
+
+    private void showBillTableRow(String firstColumn, String secondColumn, String thirdColumn) {
+        output.printf(
+                Locale.ROOT, "%-12s%-30s%18s%n", firstColumn, secondColumn, thirdColumn);
+    }
+
+    private void showBillLabelValue(String label, String value) {
+        output.printf(Locale.ROOT, "%-30s%30s%n", label, value);
     }
 
     /**
@@ -508,7 +587,7 @@ public final class CustomerUi {
 
     private String formatPrice(long priceInCents) {
         return String.format(
-                Locale.ROOT, "S$%d.%02d", priceInCents / 100, priceInCents % 100);
+                Locale.ROOT, "S$%,d.%02d", priceInCents / 100, priceInCents % 100);
     }
 
     private String readLine() {
