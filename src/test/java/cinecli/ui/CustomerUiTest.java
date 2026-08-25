@@ -149,6 +149,8 @@ class CustomerUiTest {
     void showBill_mixedSelectionsAndPromo_displaysItemizedExactAmounts() {
         StringWriter output = new StringWriter();
         CustomerUi customerUi = createUi(output);
+        Movie movie = createBillMovie();
+        Screening screening = createBillScreening();
         Bill bill = new Bill(
                 List.of(
                         new TicketSelection(
@@ -160,7 +162,7 @@ class CustomerUiTest {
                         new SnackSelection(SnackMenuItem.NACHOS, 3)),
                 Optional.of(PromoCode.CS2103));
 
-        customerUi.showBill(bill);
+        customerUi.showBill(bill, movie, screening);
 
         List<String> nonblankLines = output.toString().lines()
                 .filter(line -> !line.isBlank())
@@ -169,6 +171,8 @@ class CustomerUiTest {
                 List.of(
                         "Bill Summary",
                         "Tickets:",
+                        "Movie: Orbit of Echoes",
+                        "Time: 29 Aug 2026, 13:30",
                         "- G4: Adult - S$11.00",
                         "- G5: Senior - S$4.50",
                         "Ticket subtotal: S$15.50",
@@ -193,7 +197,7 @@ class CustomerUiTest {
                 List.of(new SnackSelection(
                         SnackMenuItem.NACHOS_COMBO, Integer.MAX_VALUE)));
 
-        customerUi.showBill(bill);
+        customerUi.showBill(bill, createBillMovie(), createBillScreening());
 
         assertAll(
                 () -> assertTrue(output.toString().contains(
@@ -273,6 +277,15 @@ class CustomerUiTest {
 
     private CustomerUi createUi(StringWriter output) {
         return new CustomerUi(new StringReader(""), output, new StringWriter());
+    }
+
+    private Movie createBillMovie() {
+        return new Movie(
+                "MOV-001", "Orbit of Echoes", ContentRating.PG13, List.of());
+    }
+
+    private Screening createBillScreening() {
+        return new Screening("SCR-001", LocalDateTime.of(2026, 8, 29, 13, 30));
     }
 
     private int indexOfTrimmedLine(List<String> lines, String expectedLine) {

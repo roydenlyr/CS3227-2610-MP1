@@ -348,12 +348,18 @@ public final class CustomerUi {
      * Shows the itemized bill and exact payable total.
      *
      * @param bill Completed customer bill.
+     * @param movie Selected movie.
+     * @param screening Selected screening.
      */
-    public void showBill(Bill bill) {
+    public void showBill(Bill bill, Movie movie, Screening screening) {
         Objects.requireNonNull(bill);
+        Objects.requireNonNull(movie);
+        Objects.requireNonNull(screening);
         output.println();
         output.println("Bill Summary");
         output.println("Tickets:");
+        output.println("Movie: " + movie.title());
+        output.println("Time: " + screening.startsAt().format(SCREENING_TIME_FORMATTER));
         for (TicketSelection selection : bill.ticketSelections()) {
             output.println("- " + formatTicketSelection(selection));
         }

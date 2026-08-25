@@ -85,7 +85,8 @@ public final class CustomerApplication {
 
         Bill bill = requestBill(confirmedSeats);
         if (bill != null) {
-            customerUi.showBill(bill);
+            customerUi.showBill(
+                    bill, selectedScreening.movie(), selectedScreening.screening());
         }
     }
 
