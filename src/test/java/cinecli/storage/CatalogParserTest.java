@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import cinecli.model.ContentRating;
 import cinecli.model.Movie;
 import java.io.StringReader;
+import java.io.IOException;
+import java.io.Reader;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,11 @@ class CatalogParserTest {
     @Test
     void parse_headerOnlyCatalog_returnsEmptyCatalog() throws CatalogStorageException {
         assertTrue(parse("CINECLI-CATALOG\t1\n").isEmpty());
+    }
+
+    @Test
+    void parse_headerWithByteOrderMark_acceptsUtf8Marker() throws CatalogStorageException {
+        assertTrue(parse("\uFEFFCINECLI-CATALOG\t1\n").isEmpty());
     }
 
     @Test
@@ -118,6 +125,52 @@ class CatalogParserTest {
     @Test
     void parse_blankRecord_exceptionThrown() {
         assertMalformed("CINECLI-CATALOG\t1\n\n", "blank records are not allowed");
+    }
+
+    @Test
+    void parse_additionalMalformedPartitions_reportPreciseReasons() {
+        assertAll(
+                () -> assertMalformed("", "missing catalog header"),
+                () -> assertMalformed("NOT-CATALOG\t1\n", "expected header"),
+                () -> assertMalformed("CINECLI-CATALOG\t2\n", "unsupported catalog format"),
+                () -> assertMalformed("CINECLI-CATALOG\t1\nOTHER\tx\n", "unknown record type"),
+                () -> assertMalformed(
+                        "CINECLI-CATALOG\t1\nSCREENING\tSCR-1\tMOV-1\t2026-01-01\n",
+                        "requires 5 tab-separated fields"),
+                () -> assertMalformed(
+                        "CINECLI-CATALOG\t1\nMOVIE\tMOV-1\t \tPG13\n",
+                        "title must not be blank"),
+                () -> assertMalformed(
+                        "CINECLI-CATALOG\t1\nMOVIE\tMOV-1\t Padded\tPG13\n",
+                        "leading or trailing whitespace"),
+                () -> assertMalformed(
+                        "CINECLI-CATALOG\t1\nSCREENING\t\tMOV-1\t2026-01-01\t10:00\n",
+                        "screening ID"),
+                () -> assertMalformed(
+                        "CINECLI-CATALOG\t1\nSCREENING\tSCR-1\t\t2026-01-01\t10:00\n",
+                        "movie ID"));
+    }
+
+    @Test
+    void parse_readerFailure_preservesCause() {
+        IOException cause = new IOException("simulated read failure");
+        Reader failingReader = new Reader() {
+            @Override
+            public int read(char[] buffer, int offset, int length) throws IOException {
+                throw cause;
+            }
+
+            @Override
+            public void close() {
+                // Nothing to close.
+            }
+        };
+
+        CatalogStorageException exception = assertThrows(
+                CatalogStorageException.class,
+                () -> catalogParser.parse(failingReader, "failing catalog"));
+
+        assertEquals(cause, exception.getCause());
     }
 
     private List<Movie> parse(String catalog) throws CatalogStorageException {

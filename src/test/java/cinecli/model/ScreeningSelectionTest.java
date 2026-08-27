@@ -35,4 +35,24 @@ class ScreeningSelectionTest {
                 () -> assertEquals("Z", ScreeningSelection.formatTimingLabel(26)),
                 () -> assertEquals("AA", ScreeningSelection.formatTimingLabel(27)));
     }
+
+    @Test
+    void constructor_belowMinimumValues_rejectsEachField() {
+        assertAll(
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new ScreeningSelection(0, 1)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new ScreeningSelection(1, 0)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> ScreeningSelection.formatTimingLabel(0)));
+    }
+
+    @Test
+    void parse_valuesBeyondIntegerCapacity_reportsSpecificField() {
+        assertAll(
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> ScreeningSelection.parse("999999999999999999999A")),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> ScreeningSelection.parse("1ZZZZZZZZ")));
+    }
 }

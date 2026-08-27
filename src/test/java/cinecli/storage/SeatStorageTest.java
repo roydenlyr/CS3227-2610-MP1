@@ -176,6 +176,135 @@ class SeatStorageTest {
                 () -> assertFalse(Files.exists(runtimeSeats)));
     }
 
+    @Test
+    void load_initializationFailure_wrapsCauseAndLeavesFileMissing() {
+        Path runtimeSeats = runtimeSeatsPath();
+        IOException cause = new IOException("simulated initialization failure");
+        SeatStorage seatStorage = new SeatStorage(
+                runtimeSeats,
+                (operation, path) -> {
+                    if (operation.equals("create-directories")) {
+                        throw cause;
+                    }
+                });
+
+        SeatStorageException exception = assertThrows(
+                SeatStorageException.class,
+                () -> seatStorage.loadTakenSeats("SCR-001", KNOWN_SCREENING_IDS));
+
+        assertAll(
+                () -> assertEquals(cause, exception.getCause()),
+                () -> assertFalse(Files.exists(runtimeSeats)));
+    }
+
+    @Test
+    void load_concurrentInitialization_acceptsHeaderCreatedByOtherCaller() throws Exception {
+        Path runtimeSeats = runtimeSeatsPath();
+        SeatStorage seatStorage = new SeatStorage(
+                runtimeSeats,
+                (operation, path) -> {
+                    if (operation.equals("initialize")) {
+                        Files.writeString(path, "CINECLI-SEATS\t1\n", UTF_8);
+                    }
+                });
+
+        Set<SeatCoordinate> seats = seatStorage.loadTakenSeats(
+                "SCR-001", KNOWN_SCREENING_IDS);
+
+        assertTrue(seats.isEmpty());
+    }
+
+    @Test
+    void load_readFailure_wrapsCauseWithoutChangingFile() throws Exception {
+        Path runtimeSeats = writeRuntimeSeats("CINECLI-SEATS\t1\n");
+        byte[] originalBytes = Files.readAllBytes(runtimeSeats);
+        IOException cause = new IOException("simulated read failure");
+        SeatStorage seatStorage = new SeatStorage(
+                runtimeSeats,
+                (operation, path) -> {
+                    if (operation.equals("read")) {
+                        throw cause;
+                    }
+                });
+
+        SeatStorageException exception = assertThrows(
+                SeatStorageException.class,
+                () -> seatStorage.loadTakenSeats("SCR-001", KNOWN_SCREENING_IDS));
+
+        assertAll(
+                () -> assertEquals(cause, exception.getCause()),
+                () -> assertArrayEquals(originalBytes, Files.readAllBytes(runtimeSeats)));
+    }
+
+    @Test
+    void confirmSeats_atomicReplacementUnsupported_preservesOriginalFile() throws Exception {
+        Path runtimeSeats = writeRuntimeSeats("CINECLI-SEATS\t1\n");
+        byte[] originalBytes = Files.readAllBytes(runtimeSeats);
+        SeatStorage seatStorage = new SeatStorage(
+                runtimeSeats,
+                (operation, path) -> {
+                    if (operation.equals("replace")) {
+                        throw new java.nio.file.AtomicMoveNotSupportedException(
+                                path.toString(), path.toString(), "simulated");
+                    }
+                });
+
+        SeatStorageException exception = assertThrows(
+                SeatStorageException.class,
+                () -> seatStorage.confirmSeats(
+                        "SCR-001", Set.of(SeatCoordinate.parse("A1")), KNOWN_SCREENING_IDS));
+
+        assertAll(
+                () -> assertTrue(exception.getMessage().contains("atomic replacement")),
+                () -> assertArrayEquals(originalBytes, Files.readAllBytes(runtimeSeats)));
+    }
+
+    @Test
+    void confirmSeats_temporaryCreationFailure_preservesOriginalFile() throws Exception {
+        Path runtimeSeats = writeRuntimeSeats("CINECLI-SEATS\t1\n");
+        byte[] originalBytes = Files.readAllBytes(runtimeSeats);
+        IOException cause = new IOException("simulated temporary-file failure");
+        SeatStorage seatStorage = new SeatStorage(
+                runtimeSeats,
+                (operation, path) -> {
+                    if (operation.equals("create-temporary")) {
+                        throw cause;
+                    }
+                });
+
+        SeatStorageException exception = assertThrows(
+                SeatStorageException.class,
+                () -> seatStorage.confirmSeats(
+                        "SCR-001", Set.of(SeatCoordinate.parse("A1")), KNOWN_SCREENING_IDS));
+
+        assertAll(
+                () -> assertEquals(cause, exception.getCause()),
+                () -> assertArrayEquals(originalBytes, Files.readAllBytes(runtimeSeats)));
+    }
+
+    @Test
+    void confirmSeats_cleanupFailure_doesNotHidePrimaryWriteFailure() throws Exception {
+        Path runtimeSeats = writeRuntimeSeats("CINECLI-SEATS\t1\n");
+        IOException writeCause = new IOException("simulated write failure");
+        SeatStorage seatStorage = new SeatStorage(
+                runtimeSeats,
+                (operation, path) -> {
+                    if (operation.equals("write-temporary")) {
+                        throw writeCause;
+                    }
+                    if (operation.equals("delete-temporary")) {
+                        throw new IOException("simulated cleanup failure");
+                    }
+                });
+
+        SeatStorageException exception = assertThrows(
+                SeatStorageException.class,
+                () -> seatStorage.confirmSeats(
+                        "SCR-001", Set.of(SeatCoordinate.parse("A1")), KNOWN_SCREENING_IDS));
+
+        assertEquals(writeCause, exception.getCause());
+    }
+
     private Path runtimeSeatsPath() {
         return tempDirectory.resolve("data/runtime/seats.tsv");
     }

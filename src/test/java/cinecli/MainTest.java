@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.file.Files;
@@ -16,6 +19,30 @@ import org.junit.jupiter.api.io.TempDir;
 class MainTest {
     @TempDir
     Path tempDirectory;
+
+    @Test
+    void main_endOfInput_usesProcessStreamsAndExitsCleanly() throws Exception {
+        var originalInput = System.in;
+        var originalOutput = System.out;
+        var originalError = System.err;
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+        try {
+            System.setIn(new ByteArrayInputStream(new byte[0]));
+            System.setOut(new PrintStream(output, true, UTF_8));
+            System.setErr(new PrintStream(error, true, UTF_8));
+
+            Main.main(new String[0]);
+        } finally {
+            System.setIn(originalInput);
+            System.setOut(originalOutput);
+            System.setErr(originalError);
+        }
+
+        assertAll(
+                () -> assertTrue(output.toString(UTF_8).contains("Welcome to CineCLI")),
+                () -> assertEquals("", error.toString(UTF_8)));
+    }
 
     @Test
     void run_missingRuntimeCatalog_initializesAndDisplaysSeed() throws IOException {

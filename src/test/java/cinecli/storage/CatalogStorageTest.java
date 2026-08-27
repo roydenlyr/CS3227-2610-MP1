@@ -116,6 +116,69 @@ class CatalogStorageTest {
         assertTrue(exception.getMessage().contains("Bundled default catalog"));
     }
 
+    @Test
+    void load_readFailure_wrapsCauseWithoutChangingExistingFile() throws Exception {
+        Path runtimeCatalog = writeRuntimeCatalog("CINECLI-CATALOG\t1\n");
+        byte[] originalBytes = Files.readAllBytes(runtimeCatalog);
+        IOException cause = new IOException("simulated read failure");
+        CatalogStorage catalogStorage = new CatalogStorage(
+                runtimeCatalog,
+                DEFAULT_RESOURCE,
+                (operation, path) -> {
+                    if (operation.equals("read")) {
+                        throw cause;
+                    }
+                });
+
+        CatalogStorageException exception = assertThrows(
+                CatalogStorageException.class, catalogStorage::load);
+
+        assertAll(
+                () -> assertEquals(cause, exception.getCause()),
+                () -> assertArrayEquals(originalBytes, Files.readAllBytes(runtimeCatalog)));
+    }
+
+    @Test
+    void load_initializationFailure_wrapsCauseAndLeavesFileMissing() {
+        Path runtimeCatalog = tempDirectory.resolve("unavailable/catalog.tsv");
+        IOException cause = new IOException("simulated directory failure");
+        CatalogStorage catalogStorage = new CatalogStorage(
+                runtimeCatalog,
+                DEFAULT_RESOURCE,
+                (operation, path) -> {
+                    if (operation.equals("create-directories")) {
+                        throw cause;
+                    }
+                });
+
+        CatalogStorageException exception = assertThrows(
+                CatalogStorageException.class, catalogStorage::load);
+
+        assertAll(
+                () -> assertEquals(cause, exception.getCause()),
+                () -> assertFalse(Files.exists(runtimeCatalog)));
+    }
+
+    @Test
+    void load_concurrentInitialization_usesFileCreatedByOtherCaller() throws Exception {
+        Path runtimeCatalog = tempDirectory.resolve("race/catalog.tsv");
+        String concurrentCatalog = "CINECLI-CATALOG\t1\n";
+        CatalogStorage catalogStorage = new CatalogStorage(
+                runtimeCatalog,
+                DEFAULT_RESOURCE,
+                (operation, path) -> {
+                    if (operation.equals("copy-default")) {
+                        Files.writeString(path, concurrentCatalog, UTF_8);
+                    }
+                });
+
+        List<Movie> movies = catalogStorage.load();
+
+        assertAll(
+                () -> assertTrue(movies.isEmpty()),
+                () -> assertEquals(concurrentCatalog, Files.readString(runtimeCatalog, UTF_8)));
+    }
+
     private Path writeRuntimeCatalog(String content) throws IOException {
         Path runtimeCatalog = tempDirectory.resolve("catalog.tsv");
         Files.writeString(runtimeCatalog, content, UTF_8);

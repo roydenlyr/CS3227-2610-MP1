@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cinecli.model.SeatCoordinate;
 import java.io.StringReader;
+import java.io.IOException;
+import java.io.Reader;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -45,6 +47,36 @@ class SeatParserTest {
     @Test
     void parse_headerOnlyFile_returnsEmptyState() throws SeatStorageException {
         assertTrue(parse("CINECLI-SEATS\t1\n").isEmpty());
+    }
+
+    @Test
+    void parse_readerFailure_preservesCause() {
+        IOException cause = new IOException("simulated read failure");
+        Reader failingReader = new Reader() {
+            @Override
+            public int read(char[] buffer, int offset, int length) throws IOException {
+                throw cause;
+            }
+
+            @Override
+            public void close() {
+                // Nothing to close.
+            }
+        };
+
+        SeatStorageException exception = assertThrows(
+                SeatStorageException.class,
+                () -> seatParser.parse(failingReader, "failing seats", KNOWN_SCREENING_IDS));
+
+        assertEquals(cause, exception.getCause());
+    }
+
+    @Test
+    void isValidScreeningId_nullAndValid_coverBothShortCircuitOutcomes() {
+        assertAll(
+                () -> assertTrue(SeatParser.isValidScreeningId("SCR-1")),
+                () -> org.junit.jupiter.api.Assertions.assertFalse(
+                        SeatParser.isValidScreeningId(null)));
     }
 
     @ParameterizedTest

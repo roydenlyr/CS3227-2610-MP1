@@ -16,6 +16,8 @@ import cinecli.model.TicketSelection;
 import cinecli.model.TicketType;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.IOException;
+import java.io.Reader;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +25,45 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class CustomerUiTest {
+
+    @Test
+    void input_endOfFileAndFailure_returnFalseAndReportOnlyFailure() {
+        StringWriter eofError = new StringWriter();
+        CustomerUi eofUi = new CustomerUi(new StringReader(""), new StringWriter(), eofError);
+        StringWriter failureError = new StringWriter();
+        Reader failingReader = new Reader() {
+            @Override
+            public int read(char[] buffer, int offset, int length) throws IOException {
+                throw new IOException("simulated input failure");
+            }
+
+            @Override
+            public void close() {
+                // Nothing to close.
+            }
+        };
+        CustomerUi failingUi = new CustomerUi(failingReader, new StringWriter(), failureError);
+
+        assertAll(
+                () -> org.junit.jupiter.api.Assertions.assertFalse(eofUi.hasUserProceeded()),
+                () -> org.junit.jupiter.api.Assertions.assertFalse(failingUi.hasUserProceeded()),
+                () -> assertEquals("", eofError.toString()),
+                () -> assertTrue(failureError.toString().contains("Unable to read input")));
+    }
+
+    @Test
+    void seatAvailabilityMessages_writeToTheirDesignatedStreams() {
+        StringWriter output = new StringWriter();
+        StringWriter error = new StringWriter();
+        CustomerUi customerUi = new CustomerUi(new StringReader(""), output, error);
+
+        customerUi.showNoSeatsAvailable();
+        customerUi.showSeatStorageError("disk unavailable");
+
+        assertAll(
+                () -> assertTrue(output.toString().contains("No seats are available")),
+                () -> assertTrue(error.toString().contains("disk unavailable")));
+    }
     @Test
     void showCatalog_multipleScreenings_labelsTimingsWithLetters() {
         StringWriter output = new StringWriter();

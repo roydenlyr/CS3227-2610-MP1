@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cinecli.storage.CatalogStorage;
 import cinecli.storage.SeatStorage;
+import cinecli.storage.SeatStorageTestSupport;
 import cinecli.ui.CustomerUi;
 import java.io.IOException;
 import java.io.StringReader;
@@ -58,6 +59,123 @@ class CustomerApplicationTest {
                 () -> assertTrue(applicationOutput.normalOutput()
                         .contains("No movies are currently available.")),
                 () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_endOfInputAtWelcome_stopsBeforeLoadingData() throws IOException {
+        String catalog = "CINECLI-CATALOG\t1\n";
+
+        ApplicationOutput applicationOutput = runWithData(catalog, null, "");
+
+        assertAll(
+                () -> assertTrue(applicationOutput.normalOutput().contains("Welcome to CineCLI")),
+                () -> assertFalse(Files.exists(applicationOutput.runtimeSeats())),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_timingBeyondMovieAndEmptyMovieBeforeAvailableMovie_reprompts() throws IOException {
+        String catalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-EMPTY\tNo Shows\tPG13
+                MOVIE\tMOV-LIVE\tHas Show\tM18
+                SCREENING\tSCR-LIVE\tMOV-LIVE\t2026-10-10\t10:00
+                """;
+
+        ApplicationOutput applicationOutput = runWithData(
+                catalog, null, "\n2B\n2A\nCANCEL\n");
+
+        assertAll(
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "movie 2 does not have timing B")),
+                () -> assertTrue(applicationOutput.normalOutput().contains("Movie: Has Show")),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_malformedSeatFile_reportsStorageFailureWithoutOverwriting() throws IOException {
+        String catalog = singleScreeningCatalog();
+        String seats = "malformed seats\n";
+
+        ApplicationOutput applicationOutput = runWithData(catalog, seats, "\n1A\n");
+
+        assertAll(
+                () -> assertTrue(applicationOutput.errorOutput().contains(
+                        "Unable to load or update seat availability")),
+                () -> assertEquals(seats, Files.readString(applicationOutput.runtimeSeats(), UTF_8)),
+                () -> assertFalse(applicationOutput.normalOutput().contains("Ticket Types")));
+    }
+
+    @Test
+    void run_fullyOccupiedScreening_reportsNoAvailability() throws IOException {
+        StringBuilder seats = new StringBuilder("CINECLI-SEATS\t1\n");
+        for (char row = 'A'; row <= 'G'; row++) {
+            for (int number = 1; number <= 20; number++) {
+                seats.append("TAKEN_SEAT\tSCR-001\t").append(row).append(number).append('\n');
+            }
+        }
+
+        ApplicationOutput applicationOutput = runWithData(
+                singleScreeningCatalog(), seats.toString(), "\n1A\n");
+
+        assertAll(
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "No seats are available for this screening")),
+                () -> assertFalse(applicationOutput.normalOutput().contains("Select one or more seats")),
+                () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_endOfInputAtEachPurchasePrompt_stopsWithoutLaterSections() throws IOException {
+        List<String> inputs = List.of(
+                "\n1A\n",
+                "\n1A\nA1\n",
+                "\n1A\nA1\nY\n",
+                "\n1A\nA1\nY\n1\n",
+                "\n1A\nA1\nY\n1\n1\n",
+                "\n1A\nA1\nY\n1\n0\n");
+
+        for (String input : inputs) {
+            Path runtimeSeats = tempDirectory.resolve("seats.tsv");
+            Files.deleteIfExists(runtimeSeats);
+            ApplicationOutput applicationOutput = runWithData(
+                    singleScreeningCatalog(), null, input);
+            assertFalse(applicationOutput.normalOutput().contains("BILL SUMMARY"));
+        }
+    }
+
+    @Test
+    void run_blankSeatSelection_repromptsThenCancels() throws IOException {
+        ApplicationOutput applicationOutput = runWithData(
+                singleScreeningCatalog(), null, "\n1A\n   \nCANCEL\n");
+
+        assertAll(
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "enter at least one seat coordinate")),
+                () -> assertTrue(applicationOutput.normalOutput().contains(
+                        "Seat selection cancelled")));
+    }
+
+    @Test
+    void run_finalSeatWriteFailure_reportsErrorAndSuppressesLaterWorkflow() throws IOException {
+        Path runtimeCatalog = tempDirectory.resolve("catalog.tsv");
+        Path runtimeSeats = tempDirectory.resolve("seats.tsv");
+        Files.writeString(runtimeCatalog, singleScreeningCatalog(), UTF_8);
+        StringWriter normalOutput = new StringWriter();
+        StringWriter errorOutput = new StringWriter();
+        CustomerUi customerUi = new CustomerUi(
+                new StringReader("\n1A\nA1\nY\n"), normalOutput, errorOutput);
+
+        new CustomerApplication(
+                customerUi,
+                new CatalogStorage(runtimeCatalog, DEFAULT_RESOURCE),
+                SeatStorageTestSupport.failingReplacement(runtimeSeats)).run();
+
+        assertAll(
+                () -> assertTrue(errorOutput.toString().contains(
+                        "Unable to load or update seat availability")),
+                () -> assertFalse(normalOutput.toString().contains("Ticket Types")),
+                () -> assertEquals("CINECLI-SEATS\t1\n", Files.readString(runtimeSeats, UTF_8)));
     }
 
     @Test
@@ -485,6 +603,14 @@ class CustomerApplicationTest {
 
     private ApplicationOutput runWithCatalog(String catalog) throws IOException {
         return runWithData(catalog, null, "\n");
+    }
+
+    private String singleScreeningCatalog() {
+        return """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-001\tFirst Film\tPG13
+                SCREENING\tSCR-001\tMOV-001\t2026-10-10\t10:00
+                """;
     }
 
     private boolean hasBillLine(String output, String label, String value) {

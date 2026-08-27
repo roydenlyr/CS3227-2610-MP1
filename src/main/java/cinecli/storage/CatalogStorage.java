@@ -18,6 +18,7 @@ import java.util.Objects;
 public final class CatalogStorage {
     private final Path runtimeCatalogPath;
     private final String defaultCatalogResource;
+    private final StorageOperationHook operationHook;
     private final CatalogParser catalogParser = new CatalogParser();
 
     /**
@@ -27,8 +28,18 @@ public final class CatalogStorage {
      * @param defaultCatalogResource Classpath resource copied when runtime data is missing.
      */
     public CatalogStorage(Path runtimeCatalogPath, String defaultCatalogResource) {
-        this.runtimeCatalogPath = Objects.requireNonNull(runtimeCatalogPath);
+        this(runtimeCatalogPath, defaultCatalogResource, StorageOperationHook.NONE);
+    }
+
+    CatalogStorage(
+            Path runtimeCatalogPath,
+            String defaultCatalogResource,
+            StorageOperationHook operationHook) {
+        this.runtimeCatalogPath = Objects.requireNonNull(runtimeCatalogPath)
+                .toAbsolutePath()
+                .normalize();
         this.defaultCatalogResource = Objects.requireNonNull(defaultCatalogResource);
+        this.operationHook = Objects.requireNonNull(operationHook);
     }
 
     /**
@@ -40,6 +51,7 @@ public final class CatalogStorage {
     public List<Movie> load() throws CatalogStorageException {
         initializeIfMissing();
         try (BufferedReader reader = Files.newBufferedReader(runtimeCatalogPath, UTF_8)) {
+            operationHook.before("read", runtimeCatalogPath);
             return catalogParser.parse(reader, runtimeCatalogPath.toString());
         } catch (IOException exception) {
             throw new CatalogStorageException(
@@ -54,9 +66,8 @@ public final class CatalogStorage {
 
         try {
             Path parentDirectory = runtimeCatalogPath.getParent();
-            if (parentDirectory != null) {
-                Files.createDirectories(parentDirectory);
-            }
+            operationHook.before("create-directories", parentDirectory);
+            Files.createDirectories(parentDirectory);
             copyDefaultCatalog();
         } catch (IOException exception) {
             throw new CatalogStorageException(
@@ -71,6 +82,7 @@ public final class CatalogStorage {
                         "Bundled default catalog '" + defaultCatalogResource + "' is missing.");
             }
             try {
+                operationHook.before("copy-default", runtimeCatalogPath);
                 Files.copy(defaultCatalog, runtimeCatalogPath);
             } catch (FileAlreadyExistsException exception) {
                 // Another process initialized the catalog after the existence check.

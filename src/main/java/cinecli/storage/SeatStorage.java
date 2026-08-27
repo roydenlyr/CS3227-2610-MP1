@@ -22,6 +22,7 @@ import java.util.TreeSet;
  */
 public final class SeatStorage {
     private final Path runtimeSeatsPath;
+    private final StorageOperationHook operationHook;
     private final SeatParser seatParser = new SeatParser();
 
     /**
@@ -30,7 +31,12 @@ public final class SeatStorage {
      * @param runtimeSeatsPath Mutable runtime seat occupancy path.
      */
     public SeatStorage(Path runtimeSeatsPath) {
+        this(runtimeSeatsPath, StorageOperationHook.NONE);
+    }
+
+    SeatStorage(Path runtimeSeatsPath, StorageOperationHook operationHook) {
         this.runtimeSeatsPath = Objects.requireNonNull(runtimeSeatsPath).toAbsolutePath().normalize();
+        this.operationHook = Objects.requireNonNull(operationHook);
     }
 
     /**
@@ -126,7 +132,9 @@ public final class SeatStorage {
         }
 
         try {
+            operationHook.before("create-directories", runtimeSeatsPath.getParent());
             Files.createDirectories(runtimeSeatsPath.getParent());
+            operationHook.before("initialize", runtimeSeatsPath);
             Files.writeString(
                     runtimeSeatsPath,
                     SeatParser.HEADER_LINE + "\n",
@@ -144,6 +152,7 @@ public final class SeatStorage {
     private Map<String, Set<SeatCoordinate>> readAll(Set<String> knownScreeningIds)
             throws SeatStorageException {
         try (BufferedReader reader = Files.newBufferedReader(runtimeSeatsPath, UTF_8)) {
+            operationHook.before("read", runtimeSeatsPath);
             return seatParser.parse(reader, runtimeSeatsPath.toString(), knownScreeningIds);
         } catch (IOException exception) {
             throw new SeatStorageException(
@@ -165,8 +174,10 @@ public final class SeatStorage {
         String serializedState = serialize(takenSeatsByScreening);
         Path temporaryPath = null;
         try {
+            operationHook.before("create-temporary", runtimeSeatsPath.getParent());
             temporaryPath = Files.createTempFile(
                     runtimeSeatsPath.getParent(), "cinecli-seats-", ".tmp");
+            operationHook.before("write-temporary", temporaryPath);
             Files.writeString(
                     temporaryPath,
                     serializedState,
@@ -204,6 +215,7 @@ public final class SeatStorage {
     }
 
     private void replaceWithTemporaryFile(Path temporaryPath) throws IOException {
+        operationHook.before("replace", runtimeSeatsPath);
         Files.move(
                 temporaryPath,
                 runtimeSeatsPath,
@@ -216,6 +228,7 @@ public final class SeatStorage {
             return;
         }
         try {
+            operationHook.before("delete-temporary", temporaryPath);
             Files.deleteIfExists(temporaryPath);
         } catch (IOException exception) {
             // The update result is more important than cleanup of an uncommitted temporary file.
