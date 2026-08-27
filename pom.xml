@@ -111,7 +111,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>cinecli.Main</mainClass>
+                            <mainClass>cinecli.app.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
