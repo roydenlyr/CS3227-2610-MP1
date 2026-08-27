@@ -36,6 +36,9 @@ conflicting rendered examples. Do not use tabs for Java indentation.
 
 ## Engineering workflow
 
+- Before grilling, designing, or implementing an admin-interface feature, read
+  `docs/AdminInterfacePlan.md` as the approved cross-feature scope, sequence, and
+  handoff reference.
 - Inspect the relevant repository state before proposing or making changes.
 - Distinguish explicit requirements, assumptions, and recommendations.
 - For substantial changes, explain the task, ambiguities, approach, relevant
