@@ -2,6 +2,7 @@ package cinecli.storage.exception;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,8 @@ class StorageExceptionTest {
                 () -> assertEquals("catalog failed", catalogException.getMessage()),
                 () -> assertEquals(cause, catalogException.getCause()),
                 () -> assertEquals("seats failed", seatException.getMessage()),
-                () -> assertEquals(cause, seatException.getCause()));
+                () -> assertEquals(cause, seatException.getCause()),
+                () -> assertInstanceOf(StorageException.class, catalogException),
+                () -> assertInstanceOf(StorageException.class, seatException));
     }
 }

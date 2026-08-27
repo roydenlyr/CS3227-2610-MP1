@@ -3,7 +3,7 @@ package cinecli.storage.exception;
 /**
  * Signals that the movie catalog could not be initialized, read, or validated.
  */
-public final class CatalogStorageException extends Exception {
+public final class CatalogStorageException extends StorageException {
     /**
      * Creates an exception with a user-readable explanation.
      *
