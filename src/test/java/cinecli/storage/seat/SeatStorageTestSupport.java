@@ -21,7 +21,7 @@ public final class SeatStorageTestSupport {
         return new SeatStorage(
                 runtimeSeats,
                 (operation, path) -> {
-                    if (operation.equals("replace")) {
+                    if (operation == SeatStorageOperation.ATOMIC_REPLACE) {
                         throw new IOException("simulated replacement failure");
                     }
                 });

@@ -13,9 +13,9 @@ interface CatalogStorageOperationHook {
     /**
      * Runs immediately before a named file operation.
      *
-     * @param operation Stable operation name.
+     * @param operation Typed file-system operation.
      * @param path Operation target.
      * @throws IOException If the operation should fail.
      */
-    void before(String operation, Path path) throws IOException;
+    void before(CatalogStorageOperation operation, Path path) throws IOException;
 }

@@ -6,6 +6,7 @@ import cinecli.model.SeatCoordinate;
 import cinecli.storage.exception.SeatStorageException;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -57,6 +58,69 @@ public final class SeatStorage {
 
         Map<String, Set<SeatCoordinate>> takenSeatsByScreening = readAll(validatedKnownScreeningIds);
         return takenSeatsByScreening.getOrDefault(screeningId, Set.of());
+    }
+
+    /**
+     * Loads the complete occupancy state without creating a missing file.
+     *
+     * @param knownScreeningIds Screening IDs in the current catalogue.
+     * @return Validated presence-aware occupancy snapshot.
+     * @throws SeatStorageException If an existing file cannot be read or validated.
+     */
+    public SeatOccupancySnapshot loadSnapshot(Set<String> knownScreeningIds)
+            throws SeatStorageException {
+        Set<String> validatedKnownScreeningIds = validateKnownScreeningIds(knownScreeningIds);
+        if (!Files.exists(runtimeSeatsPath)) {
+            return SeatOccupancySnapshot.missing();
+        }
+        return SeatOccupancySnapshot.present(readAll(validatedKnownScreeningIds));
+    }
+
+    /**
+     * Replaces a present occupancy snapshot atomically while preserving file presence.
+     *
+     * @param intendedSnapshot Complete intended state.
+     * @param knownScreeningIds Screening IDs in the intended catalogue.
+     * @throws SeatStorageException If presence changes, validation fails, or persistence fails.
+     */
+    public void replaceSnapshot(
+            SeatOccupancySnapshot intendedSnapshot, Set<String> knownScreeningIds)
+            throws SeatStorageException {
+        Objects.requireNonNull(intendedSnapshot);
+        Set<String> validatedKnownScreeningIds = validateKnownScreeningIds(knownScreeningIds);
+        boolean isCurrentlyPresent = Files.exists(runtimeSeatsPath);
+        if (!intendedSnapshot.isPresent()) {
+            if (isCurrentlyPresent) {
+                throw new SeatStorageException("Seat occupancy presence cannot change.");
+            }
+            return;
+        }
+        if (!isCurrentlyPresent) {
+            throw new SeatStorageException("Seat occupancy presence cannot change.");
+        }
+        Map<String, Set<SeatCoordinate>> currentState = readAll(validatedKnownScreeningIds);
+        validateSnapshot(intendedSnapshot, validatedKnownScreeningIds);
+        if (currentState.equals(intendedSnapshot.occupiedSeatsByScreening())) {
+            return;
+        }
+        writeAll(intendedSnapshot.occupiedSeatsByScreening());
+    }
+
+    void replaceTransactionSnapshot(
+            SeatOccupancySnapshot intendedSnapshot, Set<String> knownScreeningIds)
+            throws SeatStorageException {
+        Set<String> validatedKnownScreeningIds = validateKnownScreeningIds(knownScreeningIds);
+        validateSnapshot(intendedSnapshot, validatedKnownScreeningIds);
+        if (!intendedSnapshot.isPresent()) {
+            if (Files.exists(runtimeSeatsPath)) {
+                throw new SeatStorageException("Seat occupancy presence cannot change.");
+            }
+            return;
+        }
+        if (!Files.exists(runtimeSeatsPath)) {
+            throw new SeatStorageException("Seat occupancy presence cannot change.");
+        }
+        writeAll(intendedSnapshot.occupiedSeatsByScreening());
     }
 
     /**
@@ -127,15 +191,24 @@ public final class SeatStorage {
         return validatedSeats;
     }
 
+    private void validateSnapshot(
+            SeatOccupancySnapshot snapshot, Set<String> knownScreeningIds) {
+        for (String screeningId : snapshot.occupiedSeatsByScreening().keySet()) {
+            if (!knownScreeningIds.contains(screeningId)) {
+                throw new IllegalArgumentException("unknown screening ID '" + screeningId + "'");
+            }
+        }
+    }
+
     private void initializeIfMissing() throws SeatStorageException {
         if (Files.exists(runtimeSeatsPath)) {
             return;
         }
 
         try {
-            operationHook.before("create-directories", runtimeSeatsPath.getParent());
+            operationHook.before(SeatStorageOperation.CREATE_DIRECTORIES, runtimeSeatsPath.getParent());
             Files.createDirectories(runtimeSeatsPath.getParent());
-            operationHook.before("initialize", runtimeSeatsPath);
+            operationHook.before(SeatStorageOperation.INITIALIZE_TARGET, runtimeSeatsPath);
             Files.writeString(
                     runtimeSeatsPath,
                     SeatParser.HEADER_LINE + "\n",
@@ -153,7 +226,7 @@ public final class SeatStorage {
     private Map<String, Set<SeatCoordinate>> readAll(Set<String> knownScreeningIds)
             throws SeatStorageException {
         try (BufferedReader reader = Files.newBufferedReader(runtimeSeatsPath, UTF_8)) {
-            operationHook.before("read", runtimeSeatsPath);
+            operationHook.before(SeatStorageOperation.READ_TARGET, runtimeSeatsPath);
             return seatParser.parse(reader, runtimeSeatsPath.toString(), knownScreeningIds);
         } catch (IOException exception) {
             throw new SeatStorageException(
@@ -175,16 +248,20 @@ public final class SeatStorage {
         String serializedState = serialize(takenSeatsByScreening);
         Path temporaryPath = null;
         try {
-            operationHook.before("create-temporary", runtimeSeatsPath.getParent());
+            operationHook.before(SeatStorageOperation.CREATE_TEMPORARY, runtimeSeatsPath.getParent());
             temporaryPath = Files.createTempFile(
                     runtimeSeatsPath.getParent(), "cinecli-seats-", ".tmp");
-            operationHook.before("write-temporary", temporaryPath);
+            operationHook.before(SeatStorageOperation.WRITE_TEMPORARY, temporaryPath);
             Files.writeString(
                     temporaryPath,
                     serializedState,
                     UTF_8,
                     StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE);
+            operationHook.before(SeatStorageOperation.FORCE_TEMPORARY, temporaryPath);
+            try (FileChannel channel = FileChannel.open(temporaryPath, StandardOpenOption.WRITE)) {
+                channel.force(true);
+            }
             replaceWithTemporaryFile(temporaryPath);
         } catch (AtomicMoveNotSupportedException exception) {
             throw new SeatStorageException(
@@ -200,7 +277,7 @@ public final class SeatStorage {
         }
     }
 
-    private String serialize(Map<String, Set<SeatCoordinate>> takenSeatsByScreening) {
+    static String serialize(Map<String, Set<SeatCoordinate>> takenSeatsByScreening) {
         StringBuilder serializedState = new StringBuilder(SeatParser.HEADER_LINE).append('\n');
         Map<String, Set<SeatCoordinate>> sortedState = new TreeMap<>(takenSeatsByScreening);
         for (Map.Entry<String, Set<SeatCoordinate>> entry : sortedState.entrySet()) {
@@ -216,7 +293,7 @@ public final class SeatStorage {
     }
 
     private void replaceWithTemporaryFile(Path temporaryPath) throws IOException {
-        operationHook.before("replace", runtimeSeatsPath);
+        operationHook.before(SeatStorageOperation.ATOMIC_REPLACE, runtimeSeatsPath);
         Files.move(
                 temporaryPath,
                 runtimeSeatsPath,
@@ -229,7 +306,7 @@ public final class SeatStorage {
             return;
         }
         try {
-            operationHook.before("delete-temporary", temporaryPath);
+            operationHook.before(SeatStorageOperation.DELETE_TEMPORARY, temporaryPath);
             Files.deleteIfExists(temporaryPath);
         } catch (IOException exception) {
             // The update result is more important than cleanup of an uncommitted temporary file.
