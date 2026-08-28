@@ -17,18 +17,18 @@ For each remaining feature, use this sequence:
    remaining feature.
 3. Invoke `$grill-me` for that feature. Resolve its product ambiguities without
    silently changing the cross-feature decisions in this document.
-4. Produce and obtain owner approval for a PDD.
+4. Produce and obtain owner approval for a PRD.
 5. Produce and obtain owner approval for a TDD consistent with the approved
-   PDD.
+   PRD.
 6. Start implementation only after the owner approves both documents.
 7. Implement on the feature branch from the latest integration tip using
    incremental, coherent, green commits and the coverage workflow below.
 
-If feature-level grilling, a PDD, or a TDD conflicts with this plan, present the
+If feature-level grilling, a PRD, or a TDD conflicts with this plan, present the
 conflict to the owner. Treat a new owner decision as an explicit amendment and
 update this document in the same workstream.
 
-Persist each approved feature PDD, TDD, and requirements-to-tests checklist
+Persist each approved feature PRD, TDD, and requirements-to-tests checklist
 under `docs/admin/<feature>/`. Mark the approval status and date at the top of
 each artifact so a later task can distinguish a draft from an owner-approved
 design.
@@ -233,7 +233,7 @@ in-memory bill.
 - Deleting a screening clears its persisted occupancy.
 - Delete only after validation, preview, and Y/N confirmation.
 
-The feature-level PDD must define exact guided input flows, field-edit choices,
+The feature-level PRD must define exact guided input flows, field-edit choices,
 validation messages, cancellation behaviour, ordering behaviour, and previews.
 The TDD must fit those decisions to catalogue version 1 without changing its
 approved compatibility guarantees.
@@ -274,7 +274,7 @@ exact decimal/cents semantics rather than binary floating-point arithmetic.
 The missing-file seed also preserves the current promotions: `CS2103` at 20%
 and `CS3227` at 99%.
 
-The feature-level PDD must resolve exact user interaction, duplicate-edit
+The feature-level PRD must resolve exact user interaction, duplicate-edit
 behaviour, confirmation previews, and cancellation semantics. The TDD must
 resolve the canonical version 1 record grammar without weakening the persistence
 requirements below.
@@ -337,7 +337,7 @@ journal containing the intended catalogue and seat snapshots.
 - Recovery must not overwrite current files when the journal cannot be safely
   interpreted.
 
-The catalogue-management TDD must define the journal's version 1 grammar,
+The movie-management TDD must define the journal's version 1 grammar,
 transaction states, write ordering, recovery decision table, and deterministic
 fault-injection seams before implementation.
 
@@ -422,7 +422,7 @@ Before the completed integration branch is offered for owner review:
 2. Inspect the JaCoCo HTML report.
 3. Inspect the packaged JAR and bundled resources.
 4. Run scripted JAR smoke tests from an empty temporary directory.
-5. Review the complete integration diff against this plan, every approved PDD,
+5. Review the complete integration diff against this plan, every approved PRD,
    every approved TDD, and both authoritative standards.
 
 ## Git workflow
@@ -445,18 +445,25 @@ Process the remaining branches sequentially from the latest
 `codex/admin-interface` tip:
 
 1. `codex/admin-pricing-storage`
-2. `codex/admin-catalog-management`
-3. `codex/admin-pricing-management`
-4. `codex/admin-role-routing`
-5. `codex/admin-documentation`
+2. `codex/admin-movie-management`
+3. `codex/admin-screening-management`
+4. `codex/admin-pricing-management`
+5. `codex/admin-role-routing`
+6. `codex/admin-documentation`
 
-The owner may split a feature further during grilling, PDD, or TDD. Record an
+Owner-approved split recorded on 27 August 2026: the former combined catalogue
+management workstream is divided into Movie management followed by Screening
+management. Movie management owns movie CRUD, movie-deletion cascade, and the
+shared deletion-recovery foundation. Screening management owns standalone
+screening CRUD and reuses that foundation.
+
+The owner may split a feature further during grilling, PRD, or TDD. Record an
 approved split in this document before implementation and preserve the same
 sequential integration rule.
 
 For each branch:
 
-1. Complete and approve its grilling, PDD, and TDD.
+1. Complete and approve its grilling, PRD, and TDD.
 2. Create it from the latest integration tip.
 3. Commit incremental, coherent, passing behaviour slices.
 4. Run relevant focused tests while developing.
@@ -483,7 +490,7 @@ details into the active design prematurely.
 
 Branch: `codex/admin-pricing-storage`
 
-Grill, PDD, and TDD must resolve:
+Grill, PRD, and TDD must resolve:
 
 - immutable price snapshots in ticket/snack selections and `Bill`;
 - the `pricing.tsv` version 1 canonical grammar;
@@ -494,26 +501,45 @@ Grill, PDD, and TDD must resolve:
 - atomic replacement and fault injection; and
 - customer loading behaviour before admin editing exists.
 
-### Catalogue management
+### Movie management
 
-Branch: `codex/admin-catalog-management`
+Branch: `codex/admin-movie-management`
 
-Grill, PDD, and TDD must resolve:
+Artifacts: `docs/admin/movies/`
 
-- movie and screening guided CRUD flows;
-- immutable UUID-based IDs;
-- mutable fields, ordering, previews, confirmation, and cancellation;
-- movie-deletion cascade and screening-deletion seat clearing;
-- rescheduling with occupancy preservation;
+Grill, PRD, and TDD must resolve:
+
+- guided movie list, add, edit, and delete flows;
+- immutable `MOV-<UUID>` IDs;
+- mutable title and rating fields, ordering, previews, confirmation, and
+  cancellation;
+- movie-deletion cascade through child screenings and their persisted occupancy;
 - canonical catalogue and occupancy updates;
 - recovery-journal grammar, ordering, and idempotent recovery; and
 - malformed/unrecoverable journal blocking behaviour.
+
+### Screening management
+
+Branch: `codex/admin-screening-management`
+
+Artifacts: `docs/admin/screenings/`
+
+Grill, PRD, and TDD must resolve:
+
+- guided screening list, add, edit, and delete flows;
+- immutable `SCR-<UUID>` IDs;
+- approved mutable fields, parent-movie selection, ordering, previews,
+  confirmation, and cancellation;
+- rescheduling with occupancy preservation;
+- screening-deletion seat clearing;
+- canonical catalogue and occupancy updates; and
+- reuse of the recovery foundation introduced by Movie management.
 
 ### Pricing management
 
 Branch: `codex/admin-pricing-management`
 
-Grill, PDD, and TDD must resolve:
+Grill, PRD, and TDD must resolve:
 
 - guided fixed-price edit flows;
 - promotion list/add/edit/delete flows;
@@ -526,7 +552,7 @@ Grill, PDD, and TDD must resolve:
 
 Branch: `codex/admin-role-routing`
 
-Grill, PDD, and TDD must resolve:
+Grill, PRD, and TDD must resolve:
 
 - the shared application-loop interface and typed transitions;
 - global-command interception at every prompt;
@@ -557,7 +583,7 @@ Read AGENTS.md and docs/AdminInterfacePlan.md completely. Work only on the
 [feature name] entry in the feature handoff index. Inspect the latest
 codex/admin-interface state and distinguish completed behaviour from target
 behaviour. Start with $grill-me and do not implement production code. After the
-feature plan is finalized, produce a PDD for owner approval, followed by a TDD
+feature plan is finalized, produce a PRD for owner approval, followed by a TDD
 for owner approval. Implementation may begin only after both are approved.
 Preserve every cross-feature decision and report any conflict instead of
 resolving it silently.
