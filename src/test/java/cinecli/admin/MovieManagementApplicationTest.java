@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import cinecli.admin.ui.AdminTerminal;
 import cinecli.admin.ui.EndOfInput;
 import cinecli.admin.ui.GlobalCommand;
 import cinecli.admin.ui.InputFailure;
@@ -332,7 +333,7 @@ class MovieManagementApplicationTest {
     }
 
     @Test
-    void run_publicConstructorAndLocalTitleCancel_coverProductionAdapters() throws Exception {
+    void run_publicConstructorsAndLocalTitleCancel_coverProductionAdapters() throws Exception {
         Fixture fixture = fixture("CINECLI-CATALOG\t1\n", null, lines("1", "/cancel", "0"));
         MovieManagementApplication application = new MovieManagementApplication(
                 new CatalogStorage(fixture.paths().catalog(), DEFAULT_RESOURCE),
@@ -341,6 +342,17 @@ class MovieManagementApplicationTest {
 
         assertEquals(MovieManagementOutcome.BACK, application.run());
         assertTrue(fixture.terminal().output().contains("Movie addition cancelled."));
+
+        Fixture sharedFixture = fixture(
+                "CINECLI-CATALOG\t1\n", null, lines("1", "/cancel", "0"));
+        AdminTerminal sharedTerminal = sharedFixture.terminal();
+        MovieManagementApplication sharedApplication = new MovieManagementApplication(
+                new CatalogStorage(sharedFixture.paths().catalog(), DEFAULT_RESOURCE),
+                transactionFor(sharedFixture.paths()),
+                sharedTerminal);
+
+        assertEquals(MovieManagementOutcome.BACK, sharedApplication.run());
+        assertTrue(sharedFixture.terminal().output().contains("Movie addition cancelled."));
     }
 
     @Test

@@ -31,7 +31,7 @@ name.
 | 003, 005, 006 | `run_numericTitleRatingAndConfirmationPartitions_repromptExactly`; `run_addConfirmed_retriesValidationAndCollisionThenAppends` | Passing |
 | 004, 013, 019 | `run_editAndDeleteCancellationAlternatives_preserveData`; `run_editFieldCancelRatingOnlyPreviewAndEmptyMessageFailure_coverAlternatives` | Passing |
 | 007 | `run_addConfirmed_retriesValidationAndCollisionThenAppends` | Passing |
-| 008 | `run_addCancelledAtRating_preservesExactCatalog`; `run_publicConstructorAndLocalTitleCancel_coverProductionAdapters` | Passing |
+| 008 | `run_addCancelledAtRating_preservesExactCatalog`; `run_publicConstructorsAndLocalTitleCancel_coverProductionAdapters` | Passing |
 | 009, 014 | `run_addOrEditSaveFailure_reportsNotSavedAndPreservesCatalog` | Passing |
 | 010, 011 | `run_editBothConfirmed_preservesIdentityPositionAndScreenings`; `run_editFieldCancelRatingOnlyPreviewAndEmptyMessageFailure_coverAlternatives` | Passing |
 | 012 | `run_editNoOpThenCancel_reportsWithoutWriting` | Passing |
@@ -117,8 +117,9 @@ values immediately below, at, and above every finite numbered range are covered.
 | ID | Required later evidence | Status |
 | --- | --- | --- |
 | MOV-ROUTE-001 | Production raw parsing of trimmed mixed-case `/admin`, `/customer`, and `/exit` into Movie's typed transitions at every prompt. | Deferred - role routing |
-| MOV-ROUTE-002 | Shared recovery gate before customer or administrator access to affected catalogue or occupancy data. | Deferred - role routing |
+| MOV-ROUTE-002 | Route both customer and administrator access through the shared `CatalogRecoveryGate` before affected catalogue or occupancy data is used. | Gate implemented; shared routing deferred |
 
 Movie management already tests every typed handoff and recovery behavior it owns.
-The two rows above remain mandatory acceptance items for the later role-routing
-workstream and are not claimed as implemented here.
+The production parser and cross-role use of the recovery gate remain mandatory
+acceptance items for the later role-routing workstream and are not claimed as
+implemented here.

@@ -102,9 +102,15 @@ typed terminal result and immediately returns the corresponding global outcome,
 discarding unconfirmed state. Raw recognition and the destination of those
 outcomes belong to the later role-routing workstream.
 
+Package-private `AdminInputRules` and `MovieInputRules` modules own pure input
+interpretation. Package-private `MovieManagementText` owns complete Movie screens,
+prompts, previews, and messages without performing terminal I/O. These internal
+modules remain covered through `MovieManagementApplication.run()` and do not add
+independent test seams.
+
 ### Terminal seam
 
-The injected administrator terminal interface provides three operations:
+The shared `AdminTerminal` interface provides three operations:
 
 ```java
 TerminalInput readLine();
@@ -121,7 +127,9 @@ boolean writeError(String text);
 
 The production Reader/Writer adapter will be supplied by role routing. The Movie
 workstream uses a scripted test adapter and does not take ownership of raw global
-command recognition.
+command recognition. `MovieManagementTerminal` remains as a source-compatible
+specialized name extending `AdminTerminal`; new administrator workflows use the
+shared interface rather than declaring feature-specific copies.
 
 Every screen, preview, prompt, validation response, cancellation response, and
 success response is first rendered completely in memory and passed to one
@@ -595,9 +603,10 @@ state interactions.
 ## Cross-workstream handoff
 
 The Movie workstream supplies and tests typed global-command outcomes but does
-not parse `/admin`, `/customer`, or `/exit` from raw Reader input. It also invokes
-recovery on Movie-management entry but cannot yet gate the existing customer
-entry point through the shared loop.
+not parse `/admin`, `/customer`, or `/exit` from raw Reader input. A shared
+`CatalogRecoveryGate` now hides the transaction-specific recovery result and is
+used on Movie-management entry, but the existing customer entry point cannot yet
+be routed through that gate without the shared loop.
 
 The role-routing workstream must therefore:
 
