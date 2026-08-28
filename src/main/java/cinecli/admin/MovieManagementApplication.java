@@ -405,11 +405,11 @@ public final class MovieManagementApplication {
 
     private ReadResult read() {
         TerminalInput input = terminal.readLine();
-        if (input instanceof SubmittedLine line) {
-            return new ReadResult(line.value(), null);
+        if (input instanceof SubmittedLine(String value)) {
+            return new ReadResult(value, null);
         }
-        if (input instanceof GlobalCommand command) {
-            MovieManagementOutcome outcome = switch (command.type()) {
+        if (input instanceof GlobalCommand(GlobalCommand.Type type)) {
+            MovieManagementOutcome outcome = switch (type) {
                 case ADMIN -> MovieManagementOutcome.ADMIN;
                 case CUSTOMER -> MovieManagementOutcome.CUSTOMER;
                 case EXIT -> MovieManagementOutcome.EXIT;

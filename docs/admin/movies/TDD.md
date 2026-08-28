@@ -1,10 +1,12 @@
 # CineCLI Movie Management Technical Design Document
 
-**Status:** Owner-approved
+**Status:** Draft revision awaiting owner approval
 
 **Draft date:** 28 August 2026
 
-**Approval date:** 28 August 2026
+**Original approval date:** 28 August 2026
+
+**Revision date:** 28 August 2026
 
 **Feature:** Movie management
 
@@ -20,9 +22,11 @@ the approved PRD, and the two authoritative standards PDFs referenced by those
 documents. A conflict must be presented to the owner instead of being resolved
 silently.
 
-This document does not authorize implementation. Implementation may begin only
-after the owner approves this TDD. The implementation must then proceed one
-red-green cycle at a time through the confirmed seams in this document.
+The original design was owner-approved on 28 August 2026. This revised document
+does not authorize further implementation. Its corrections and added decisions
+become authoritative only after separate owner approval. Any follow-up
+implementation must then proceed one red-green cycle at a time through the
+confirmed seams in this document.
 
 ## Design goals
 
@@ -56,7 +60,7 @@ and read-only occupancy interfaces.
 
 ## Confirmed test seams
 
-Tests cross only these seams:
+Movie-workstream tests cross only these seams:
 
 1. `MovieManagementApplication.run()` for administrator-visible workflow
    behaviour, typed navigation, and terminal failure outcomes.
@@ -148,6 +152,28 @@ complete preview has been written successfully and a submitted `Y` has been
 validated. Catalogue initialization and recovery of a previously confirmed
 journal are not new unconfirmed mutations.
 
+### Shared recovery gate
+
+`CatalogRecoveryGate` is the public, shared recovery interface for role-level
+callers that need to access catalogue or occupancy data affected by a deletion:
+
+```java
+public boolean recoverBeforeAccess() throws TransactionStorageException;
+```
+
+It hides `RecoveryResult` and the deletion transaction implementation. It returns
+`true` only when it completed a pending deletion and `false` when no journal was
+present. A checked recovery failure propagates and blocks the affected access.
+Role-level callers must use this gate rather than call
+`MovieDeletionTransaction.recover()` directly.
+
+During the Movie workstream, `MovieManagementApplication` owns the gate call and
+uses the boolean result to emit the PRD's recovery-completed message before
+listing. The role-routing TDD must later decide how the shared loop invokes the
+gate exactly once for both roles while preserving that Movie-management message;
+it must not leave both the shared loop and Movie management independently calling
+the gate for the same access.
+
 ### Input interpretation
 
 The internal Movie input parser has no independent test seam. Its behaviour is
@@ -222,21 +248,47 @@ the public deletion facade rather than these storage-internal collaborators.
 
 Before serialization, catalogue storage verifies:
 
-- the movie list and every element, rating, and screening list are non-null;
+- the movie list and every element are non-null;
 - movie IDs and screening IDs match `[A-Za-z0-9][A-Za-z0-9_-]*`;
 - movie IDs are unique among movies and screening IDs are unique among
   screenings;
 - every title is nonblank and has no leading or trailing Java `strip()`
   whitespace;
 - titles contain no tab, carriage return, or line feed that would break the TSV
-  grammar;
-- every screening time is non-null; and
+  grammar; and
 - the complete serialized state can be parsed back into an equal ordered model.
 
-The storage grammar does not newly reject other legacy ISO control characters
-that version 1 previously accepted. Admin title input cannot create them, but a
-legacy valid record remains loadable and round-trippable. This preserves the
-existing version-1 compatibility guarantee.
+The immutable model constructors already reject null ratings, screening lists,
+screenings, and screening times before a value can reach `save`. Their constructor
+tests remain the evidence for those invariants; storage tests cover every invalid
+state that can cross the public `save(List<Movie>)` interface. A missing runtime
+catalogue retains the existing version-1 initialization behaviour before Movie
+management first lists or mutates it.
+
+The current parser accepts other legacy ISO control characters. Admin title input
+cannot create them, but an existing record can currently be loaded and
+round-tripped. Whether retaining that acceptance is part of the approved
+version-1 compatibility guarantee is unresolved below.
+
+### Owner decision required: legacy control-character display
+
+The approved PRD rejects ISO control characters entered through the administrator
+UI but does not define how Movie management displays a legacy version-1 title
+that already contains a non-TSV ISO control character. The current parser accepts
+such a title, while verbatim display can send control effects to the terminal.
+This is a product and compatibility choice, not a routine implementation detail.
+
+Before this revision is approved, the owner must choose one of these behaviours:
+
+1. preserve loading and round-tripping and render the title verbatim;
+2. preserve loading and round-tripping but render each control character as a
+   visible uppercase four-hex escape such as `\u0007`; or
+3. reject such a catalogue as malformed, narrowing version-1 compatibility.
+
+Option 2 is recommended because it preserves persisted data without emitting raw
+terminal controls, but it requires a matching PRD clarification of the
+"shown in full" rule. No implementation change is authorized until the owner
+chooses and the PRD/TDD are made consistent.
 
 ### Canonical catalogue bytes
 
@@ -274,10 +326,22 @@ filesystem.
 ### Deterministic filesystem-fault adapters
 
 Existing string operation names are replaced by package-private typed enums.
-The single-file writer enum has exactly:
+The catalogue-storage enum has exactly:
 
 - `CREATE_DIRECTORIES`;
 - `READ_TARGET`;
+- `COPY_DEFAULT`;
+- `CREATE_TEMPORARY`;
+- `WRITE_TEMPORARY`;
+- `FORCE_TEMPORARY`;
+- `ATOMIC_REPLACE`; and
+- `DELETE_TEMPORARY`.
+
+The occupancy-storage enum has exactly:
+
+- `CREATE_DIRECTORIES`;
+- `READ_TARGET`;
+- `INITIALIZE_TARGET`;
 - `CREATE_TEMPORARY`;
 - `WRITE_TEMPORARY`;
 - `FORCE_TEMPORARY`;
@@ -287,6 +351,7 @@ The single-file writer enum has exactly:
 The transaction enum has exactly:
 
 - `READ_JOURNAL`;
+- `CREATE_JOURNAL_DIRECTORIES`;
 - `CREATE_JOURNAL_TEMPORARY`;
 - `WRITE_JOURNAL_TEMPORARY`;
 - `FORCE_JOURNAL_TEMPORARY`;
@@ -301,6 +366,9 @@ before that filesystem operation and may throw `IOException`. Production uses a
 no-op adapter. Package-private constructors accept deterministic test adapters.
 Tests still invoke only public storage or transaction behaviour; the hook merely
 arranges a true filesystem-seam failure and is never an assertion surface.
+Catalogue and occupancy target replacements during commit and recovery use their
+respective storage hooks, so the composed hook set covers every journal and target
+filesystem stage.
 
 ## Occupancy persistence
 
@@ -451,8 +519,12 @@ Before recovery trusts a journal, it verifies:
 - equal original and intended occupancy presence;
 - the subject movie exists exactly once in the original and not in the intended
   catalogue;
+- the subject movie has at least one child screening, because childless deletion
+  never publishes a journal;
 - intended catalogue equals original catalogue minus exactly the subject movie
-  and all its screenings, with all remaining values and orders unchanged; and
+  and all its screenings, with all remaining values and orders unchanged;
+- intended catalogue bytes equal the canonical version-1 serialization of that
+  reduced logical state; and
 - intended occupancy equals original occupancy minus exactly records for those
   child screening IDs, with all unrelated occupancy unchanged.
 
@@ -473,7 +545,8 @@ Commit uses this order:
    original presence and bytes.
 3. Serialize the complete journal in memory.
 4. Create and write a same-directory journal temporary file, then force it.
-5. Atomically publish it to the journal path without replacing an existing file.
+5. Atomically publish it to the absent journal path without requesting
+   replacement.
 6. Replace catalogue with the intended forced atomic snapshot.
 7. Replace occupancy only when present intended bytes differ from original.
 8. Re-read both targets and require exact intended presence and bytes.
@@ -481,10 +554,20 @@ Commit uses this order:
 10. Return the immutable deletion result.
 
 Successful atomic journal publication at step 5 is the durable-intent boundary.
-Failures through step 4, or failure to publish because the target already exists,
-are `NOT_APPLIED`; original target data remain unchanged. Every failure after
-step 5 is `RECOVERY_PENDING`, even when both target snapshots are already
-intended and only verification or journal cleanup failed.
+Failures through step 4 are `NOT_APPLIED`; original target data remain unchanged.
+If atomic publication reports failure, commit re-reads the journal path before
+classifying the outcome. An absent journal is `NOT_APPLIED`; the exact complete
+candidate journal is `RECOVERY_PENDING`; and any other existing journal is
+preserved, classified `NOT_APPLIED`, and will block later affected access. Every
+failure known to occur after successful publication is `RECOVERY_PENDING`, even
+when both target snapshots are already intended and only verification or journal
+cleanup failed.
+
+Java's `ATOMIC_MOVE` ignores other move options and leaves target-exists behaviour
+provider-specific. The no-replacement guarantee therefore relies on step 1 and
+the approved single-process assumption: the journal path is absent immediately
+before publication, and commit never passes `REPLACE_EXISTING`. A post-publication
+read is still required to classify a reported publication failure truthfully.
 
 A journal temporary file is not durable intent. Cleanup is best-effort and a
 leftover uniquely named temporary file is ignored by recovery.
@@ -603,10 +686,10 @@ state interactions.
 ## Cross-workstream handoff
 
 The Movie workstream supplies and tests typed global-command outcomes but does
-not parse `/admin`, `/customer`, or `/exit` from raw Reader input. A shared
-`CatalogRecoveryGate` now hides the transaction-specific recovery result and is
-used on Movie-management entry, but the existing customer entry point cannot yet
-be routed through that gate without the shared loop.
+not parse `/admin`, `/customer`, or `/exit` from raw Reader input. The revised
+design uses `CatalogRecoveryGate` to hide the transaction-specific recovery
+result on Movie-management entry, but the existing customer entry point cannot
+yet be routed through that gate without the shared loop.
 
 The role-routing workstream must therefore:
 
@@ -614,8 +697,9 @@ The role-routing workstream must therefore:
 - recognize trimmed, case-insensitive global commands at every prompt and emit
   the typed terminal outcomes defined here;
 - route `MovieManagementOutcome` values to their final destinations; and
-- call `MovieDeletionTransaction.recover()` before customer or administrator
-  access to catalogue or occupancy.
+- integrate `CatalogRecoveryGate.recoverBeforeAccess()` exactly once before
+  customer or administrator access to catalogue or occupancy, while preserving
+  the Movie-management recovery-completed message.
 
 These obligations appear as explicitly deferred checklist rows. They are not
 waived or considered implemented by approval of this TDD.
@@ -635,7 +719,8 @@ After later implementation, but not during this documentation-only task:
 
 ## Approval
 
-This TDD is a draft awaiting separate owner approval. Approval authorizes only
-the design recorded here. Branch creation, implementation, commits, integration,
-and any later change to product behaviour remain subject to the repository
-workflow and the owner's explicit directions.
+This revised TDD is awaiting separate owner approval. Approval authorizes only
+the corrected design recorded here, including the shared recovery-gate handoff,
+complete typed fault seams, canonical journal validation, and truthful journal-
+publication classification. It does not authorize implementation, commits,
+integration, or a change to product behaviour.
