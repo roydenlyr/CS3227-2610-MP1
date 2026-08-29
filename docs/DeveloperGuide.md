@@ -7,8 +7,12 @@ catalog display, screening selection, terminal seat selection, ticket demographi
 selection, optional snacks and combos, optional promotion input, and an itemized
 bill. Catalog, global pricing, and temporary seat occupancy data are strictly
 validated and persisted as versioned plain text. Ticket, snack, promotion, and
-bill selections remain session-only snapshots; payment, booking persistence, and
-administration remain deferred.
+bill selections remain session-only snapshots.
+
+Movie Management and Screening Management are implemented as administrator
+workflow modules. `Main` still wires only the customer workflow: administrator
+role routing and its end-user entry point remain deferred. Payment and booking
+persistence are also deferred.
 
 ## Toolchain
 
@@ -55,7 +59,8 @@ java -jar target/cinecli-0.1.0-SNAPSHOT.jar
 The implemented responsibilities are intentionally small:
 
 - `Main` wires UTF-8 system streams, catalog, seat, and pricing runtime paths,
-  the UI, and storage.
+  the customer UI, and customer storage. It does not yet select an administrator
+  workflow.
 - `CustomerApplication` loads pricing after the welcome step and, when that
   succeeds, coordinates catalog selection, seat-selection rules, confirmation,
   ticket and snack selection, promo input, bill creation, and graceful storage
@@ -78,11 +83,21 @@ The implemented responsibilities are intentionally small:
   complete pricing state, and atomically replaces complete saved pricing.
 - `PricingParser` strictly validates `pricing.tsv` version 1 before any state is
   returned.
+- `MovieManagementApplication` lists, adds, edits, and deletes movies through
+  the administrator terminal seam. Movie deletion removes its child screenings
+  and their occupancy when present.
+- `ScreeningManagementApplication` lists screenings in movie-major persisted
+  order; adds a screening to a selected parent movie; edits its date, time, or
+  both; and deletes it. A screening's ID and parent movie are immutable.
+- `MovieDeletionTransaction` and `CatalogRecoveryGate` provide the single
+  catalogue-deletion journal and recovery foundation used by both administrator
+  modules. Movie and Screening deletion retain their distinct semantic previews
+  and result models.
 
-No booking or checkout persistence, payment processing, administration layer, or
-production dependency has been introduced. The temporary seat writer is
-intentionally isolated so booking-owned seat allocations can replace it without
-changing the terminal map.
+No booking or checkout persistence, payment processing, administrator role
+routing, or production dependency has been introduced. The temporary seat writer
+is intentionally isolated so booking-owned seat allocations can replace it
+without changing the terminal map.
 
 ## Testing
 
@@ -96,7 +111,10 @@ discounts, half-cent rounding, checked long-cent arithmetic, exact receipt
 sections and columns, combo-description wrapping, grouped large currency amounts,
 session isolation, strict catalog, pricing, and seat validation, deterministic
 pricing and seat writes, missing-file initialization, atomic-write failures, and
-preservation of existing data bytes on failure.
+preservation of existing data bytes on failure. Administrator tests additionally
+cover Movie and Screening list/add/edit/delete workflows, generated-ID collision
+retries, occupancy preservation and clearing, cancellation, storage failures,
+durable deletion-journal recovery, and Movie-deletion regression behaviour.
 Tests never read or write the real `data/runtime` directory.
 
 Run the complete build with `clean verify` before considering an implementation
@@ -175,6 +193,39 @@ their columns remain consistent. Currency keeps exact two-decimal-cent output an
 adds comma grouping for large values. The amount saved and repeated discount are
 printed as negative adjustments, including `-S$0.00` when no promotion applies.
 
+## Administrator workflow modules
+
+The administrator modules are independently runnable through their application
+seams, pending role routing. Both show persisted state, stage Add/Edit/Delete
+changes, show a preview, and require `Y` confirmation; `N`, `/cancel`, EOF,
+input failure, output failure, and storage failures leave uncommitted state
+unchanged or terminate/report through their typed outcome as appropriate.
+
+Movie Management creates immutable `MOV-<UUID>` IDs, permits title and rating
+edits, and keeps movie order. Screening Management creates immutable
+`SCR-<UUID>` IDs, selects a parent movie only during Add, and permits only the
+date and time to change. A reschedule keeps the screening in its parent and
+position and does not read or rewrite occupancy, so its occupied seats remain
+associated with its unchanged ID. New screenings append to the selected movie;
+display order is movie-major followed by each movie's screening order.
+
+Deleting a movie or screening prepares and validates the affected catalogue state
+and, when occupancy is applicable, its snapshot before confirmation. A movie
+deletion removes its child screenings and their occupied seats; a screening
+deletion removes only that screening and its occupied seats. A missing occupancy
+file remains missing, and an existing occupancy file with no affected records
+retains its exact bytes. Malformed or unavailable occupancy blocks a deletion that
+needs the occupancy snapshot, but does not independently block Screening list,
+add, or reschedule.
+
+The shared transaction writes one durable journal before a cascaded catalogue/
+occupancy deletion. The journal records either `DELETE_MOVIE` or
+`DELETE_SCREENING`, its subject, and the original and intended snapshots. The
+recovery gate runs before either administrator module accesses affected data;
+valid pending work is completed idempotently, while malformed or divergent journal
+state blocks access rather than guessing. The standard runtime journal location
+for later routing is `data/runtime/catalog-transaction.journal`.
+
 ## Persistence
 
 The runtime catalog is `data/runtime/catalog.tsv`, resolved relative to the process
@@ -190,7 +241,9 @@ The header is compulsory. A header-only file is the valid empty catalog. IDs mat
 `[A-Za-z0-9][A-Za-z0-9_-]*` and are unique within their record type. Titles are
 nonblank without surrounding whitespace. Ratings are exactly `PG13`, `M18`, or
 `R21`. Dates and times use strict ISO-style fields, and every screening must refer
-to an existing movie. Movies and screenings retain persisted order.
+to an existing movie. Movies and screenings retain persisted order. Catalogue
+version 1 is unchanged by administrator management: newly generated IDs use
+`MOV-<UUID>` and `SCR-<UUID>`, while valid legacy IDs remain accepted.
 
 Only a missing runtime file triggers initialization from the bundled resource.
 Valid empty or malformed existing files are not overwritten. Parsing validates the

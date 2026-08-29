@@ -26,6 +26,13 @@ empty catalog. Blank lines and unknown record types are invalid.
 - Every screening must refer to an existing movie. Record order determines display
   order.
 
+Catalog version 1 remains the shared format for customer, Movie Management, and
+Screening Management state. New administrator-created IDs use `MOV-<UUID>` and
+`SCR-<UUID>`; valid legacy IDs remain accepted. Movies retain their file order;
+screenings retain their order within their parent movie. Screening Management
+therefore displays a movie-major flattened order, appends new screenings to the
+chosen parent, and preserves a screening's parent and position when rescheduled.
+
 When the runtime file is missing, CineCLI creates its parent directory if needed
 and copies the bundled defaults. An existing valid empty file remains empty. An
 existing malformed file is never overwritten or replaced with defaults; loading
@@ -113,6 +120,30 @@ The terminal's `O` and `X` characters are derived from this data and are not sto
 as a rendered grid. During interaction, `X` also represents seats tentatively
 selected in the current session; tentative choices are persisted only after the
 user confirms them.
+
+Rescheduling a screening retains every `TAKEN_SEAT` record because the screening
+ID is unchanged. Deleting a screening removes only its records; deleting a movie
+removes records for all of its child screenings. A missing occupancy file remains
+missing during deletion, while a present file with no affected records is retained
+byte-for-byte. Before a deletion that requires occupancy access, the complete
+existing file must validate; malformed or unavailable occupancy is preserved and
+causes that deletion to fail.
+
+## Catalogue deletion recovery journal
+
+Movie and Screening deletion share one durable journal at
+`data/runtime/catalog-transaction.journal` when later administrator routing uses
+the standard runtime paths. It is an implementation-owned UTF-8 version-1 file,
+not a hand-edited data format. It captures original and intended catalogue and
+occupancy snapshots, and its operation is either `DELETE_MOVIE` or
+`DELETE_SCREENING`.
+
+The journal is atomically published before a deletion that coordinates catalogue
+and occupancy state. On the next administrator access, recovery verifies the
+operation and snapshots, completes the intended state idempotently, and removes
+the journal. A malformed journal or state that diverges from both recorded
+snapshots blocks access and is retained for investigation; it is never replaced
+or guessed at. There is no separate Screening recovery mechanism.
 
 Ticket assignments, snack and combo selections, applied promo codes, and
 calculated bills are session-only. Their captured prices and percentages do not

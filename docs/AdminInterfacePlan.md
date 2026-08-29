@@ -524,16 +524,19 @@ Branch: `codex/admin-screening-management`
 
 Artifacts: `docs/admin/screenings/`
 
-Grill, PRD, and TDD must resolve:
+Status: Implemented on 29 August 2026. Concise verification traceability is
+recorded in `docs/admin/screenings/RequirementsToTests.md`.
 
-- guided screening list, add, edit, and delete flows;
-- immutable `SCR-<UUID>` IDs;
-- approved mutable fields, parent-movie selection, ordering, previews,
-  confirmation, and cancellation;
-- rescheduling with occupancy preservation;
-- screening-deletion seat clearing;
-- canonical catalogue and occupancy updates; and
-- reuse of the recovery foundation introduced by Movie management.
+- Provides guided screening list, add, edit, and delete flows.
+- Generates immutable `SCR-<UUID>` IDs; valid legacy IDs remain supported.
+- Selects a parent movie only during Add. The parent and ID are immutable; Edit
+  changes the date, time, or both.
+- Preserves occupancy during rescheduling and clears only the selected screening's
+  occupancy during deletion.
+- Retains catalogue version 1 and seat version 1, with movie-major persisted
+  display order and selected-parent append ordering.
+- Reuses the existing catalogue-deletion recovery foundation with
+  `DELETE_SCREENING` journal semantics alongside `DELETE_MOVIE`.
 
 ### Pricing management
 
