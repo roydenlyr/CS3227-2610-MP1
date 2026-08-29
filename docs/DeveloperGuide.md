@@ -9,10 +9,10 @@ bill. Catalog, global pricing, and temporary seat occupancy data are strictly
 validated and persisted as versioned plain text. Ticket, snack, promotion, and
 bill selections remain session-only snapshots.
 
-Movie Management and Screening Management are implemented as administrator
-workflow modules. `Main` still wires only the customer workflow: administrator
-role routing and its end-user entry point remain deferred. Payment and booking
-persistence are also deferred.
+Movie Management, Screening Management, and Pricing and Promotions Management
+are implemented as administrator workflow modules. `Main` still wires only the
+customer workflow: administrator role routing and its end-user entry point remain
+deferred. Payment and booking persistence are also deferred.
 
 ## Toolchain
 
@@ -89,6 +89,13 @@ The implemented responsibilities are intentionally small:
 - `ScreeningManagementApplication` lists screenings in movie-major persisted
   order; adds a screening to a selected parent movie; edits its date, time, or
   both; and deletes it. A screening's ID and parent movie are immutable.
+- `PricingManagementApplication` coordinates fixed ticket-price, snack/combo
+  price, and promotion-management workflows. Each mutation builds a complete
+  replacement `Pricing`, previews it, and saves it only after confirmation.
+- `TicketPriceManagementApplication`, `SnackComboPriceManagementApplication`,
+  and `PromotionManagementApplication` own their focused guided interactions;
+  `PricingInputRules` parses exact cents and whole percentages without binary
+  floating-point arithmetic.
 - `MovieDeletionTransaction` and `CatalogRecoveryGate` provide the single
   catalogue-deletion journal and recovery foundation used by both administrator
   modules. Movie and Screening deletion retain their distinct semantic previews
@@ -114,7 +121,10 @@ pricing and seat writes, missing-file initialization, atomic-write failures, and
 preservation of existing data bytes on failure. Administrator tests additionally
 cover Movie and Screening list/add/edit/delete workflows, generated-ID collision
 retries, occupancy preservation and clearing, cancellation, storage failures,
-durable deletion-journal recovery, and Movie-deletion regression behaviour.
+durable deletion-journal recovery, Movie-deletion regression behaviour, fixed-price
+edits, promotion CRUD/rename/collision rules, and truthful pricing-save failures.
+Tests also prove a later complete pricing replacement does not alter captured
+ticket, snack, promotion, or bill snapshots.
 Tests never read or write the real `data/runtime` directory.
 
 Run the complete build with `clean verify` before considering an implementation
@@ -225,6 +235,18 @@ recovery gate runs before either administrator module accesses affected data;
 valid pending work is completed idempotently, while malformed or divergent journal
 state blocks access rather than guessing. The standard runtime journal location
 for later routing is `data/runtime/catalog-transaction.journal`.
+
+Pricing Management keeps ticket and snack/combo identities fixed and editable in
+their menu order. It accepts only exact two-decimal prices from `S$0.01` through
+`S$9,999.99`. Promotion Management lists loaded promotions in their persisted
+order and supports add, independent code/percentage edits, and delete. Entered
+codes use `PromoCode` normalization before collision checks, so a rename cannot
+duplicate another code case-insensitively. Percentages are whole numbers from 1
+through 100, including 100%. Every mutation previews the old and intended values
+and needs `Y`; `N` or `/cancel` preserves the loaded pricing state. A failed
+atomic save reports that the change was not saved and preserves the original file.
+Saving canonicalizes the next persisted file as defined by `PricingStorage`; no
+second pricing path or data contract is introduced.
 
 ## Persistence
 

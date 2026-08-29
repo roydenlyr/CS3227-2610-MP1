@@ -78,6 +78,15 @@ same-directory temporary file, and requires atomic replacement of the target.
 If writing or atomic replacement fails, the original target data is preserved;
 the implementation does not fall back to a non-atomic move.
 
+Pricing and Promotions Management uses this same file and save protocol. It never
+adds or removes fixed ticket/snack/combo identities. An administrator mutation
+loads the complete state, constructs a replacement, previews it for confirmation,
+and saves it only after `Y`. Promotion code input is normalized using the shared
+`PromoCode` rule before duplicate checks; a promotion may be renamed or deleted.
+These configuration changes apply only to future customer selections: captured
+ticket, snack, promotion, and bill snapshots remain in memory with their original
+values.
+
 ## Temporary seat occupancy format version 1
 
 `data/runtime/seats.tsv` records confirmed seat occupancy until booking persistence

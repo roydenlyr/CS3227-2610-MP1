@@ -542,14 +542,23 @@ recorded in `docs/admin/screenings/RequirementsToTests.md`.
 
 Branch: `codex/admin-pricing-management`
 
-Grill, PRD, and TDD must resolve:
+Implemented scope: guided fixed-price edits and promotion list/add/edit/delete
+flows, using the existing immutable `Pricing` and `PricingStorage` contracts.
 
-- guided fixed-price edit flows;
-- promotion list/add/edit/delete flows;
-- code normalization and uniqueness;
-- price, percentage, and code boundaries;
-- previews, Y/N confirmation, retries, and cancellation; and
-- immediate persistence and customer-visible reload behaviour.
+- Ticket and snack/combo identities remain fixed; all existing identities are
+  editable but cannot be added or removed.
+- Price input is exact cents from `S$0.01` through `S$9,999.99`; promotion
+  percentages are whole numbers from 1 through 100, including 100.
+- Promotion codes use `PromoCode` normalization before duplicate checks. Edit may
+  rename a code and rejects collisions with a different promotion.
+- Every mutation builds a complete replacement state, previews it, and saves only
+  after `Y`; `N`, `/cancel`, global-command handoff, EOF, input/output failures,
+  and a failed save leave the uncommitted state unchanged.
+- Loading preserves a valid persisted promotion order for listing. A confirmed
+  save uses the existing canonical `PricingStorage` serialization.
+- Existing `TicketSelection`, `SnackSelection`, `PromoCode`, and `Bill`
+  snapshots are unaffected by later configuration changes. Role routing and full
+  UserGuide administrator instructions remain deferred.
 
 ### Role routing and deferred confirmation
 

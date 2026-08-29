@@ -1,4 +1,4 @@
-# Pricing Storage Requirements-to-Tests Checklist
+# Pricing and Promotions Management Requirements-to-Tests Checklist
 
 **Status:** Implementation verification record
 
@@ -19,15 +19,24 @@
 | Customer uses persisted prices and promotions in menus, selections, and bills | `CustomerApplicationTest.run_customPricing_capturesAndRendersLoadedPrices`; customer-UI rendering tests |
 | Pricing failure ends customer startup before seat access or mutation | `CustomerApplicationTest.run_malformedPricing_reportsFailureBeforeSeatStorageIsAccessed` |
 | Main wires the sibling runtime pricing path | `MainTest.run_missingRuntimeCatalog_initializesAndDisplaysSeed` |
+| Ticket prices list in menu order and edit valid/boundary exact-cent values only | `TicketPriceManagementApplicationTest` workflow and input-boundary cases |
+| Snack/combo prices list in menu order and edit valid/boundary exact-cent values only | `SnackComboPriceManagementApplicationTest` workflow and input-boundary cases |
+| Price mutation needs preview/confirmation and cancellation preserves pricing bytes | `TicketPriceManagementApplicationTest`; `SnackComboPriceManagementApplicationTest` |
+| Promotions list in loaded persisted order, add, edit, rename, and delete | `PromotionManagementApplicationTest.run_listsPromotionsInPersistedOrder`; add/edit/delete cases |
+| Promotion input normalizes codes, rejects collisions, and accepts 1% and 100% only | `PromotionManagementApplicationTest.run_addNormalizesCodeAndAcceptsPercentageBoundariesAfterInvalidValues`; `run_editRejectsCaseInsensitiveRenameCollisionAndCancellationPreservesBytes` |
+| Promotion deletion has a destructive preview and confirmation | `PromotionManagementApplicationTest.run_deleteShowsDestructivePreviewAndPersistsConfirmedRemoval` |
+| An administrator save failure is reported truthfully and retains pricing bytes | `PricingManagementStorageFailureTest.run_ticketPriceSaveFailure_reportsNotSavedAndPreservesOriginalBytes` |
+| A later complete pricing save cannot alter customer snapshots already captured | `PricingCustomerSnapshotRegressionTest.save_replacedPricing_preservesExistingCustomerPriceAndPromotionSnapshots`; `BillTest.amounts_pricingChangesAfterSelection_leaveExistingBillUnchanged` |
 
 ## Verification note
 
-The integrated worktree's reported full `mvn verify` result is 210 passing tests
-with the repository's aggregate JaCoCo line and branch coverage gate satisfied.
-Coverage is not treated as evidence in place of the behavioral and byte-level
-assertions listed above.
+Final integrated verification ran
+`.\mvnw.cmd '-Djunit.jupiter.tempdir.cleanup.mode.default=NEVER' clean verify`
+and passed 272 tests. The aggregate JaCoCo line and branch coverage gate also
+passed. Coverage is not treated as evidence in place of these behavioral and
+byte-level assertions.
 
 ## Deferred acceptance items
 
-Administrator price-editing and promotion CRUD tests, cross-role routing tests,
-and booking-persistence tests for snapshot storage are outside this workstream.
+Cross-role routing, end-user administrator instructions, and booking persistence
+of completed snapshots remain outside this workstream.
