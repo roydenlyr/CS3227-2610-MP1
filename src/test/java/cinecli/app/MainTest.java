@@ -47,6 +47,7 @@ class MainTest {
     @Test
     void run_missingRuntimeCatalog_initializesAndDisplaysSeed() throws IOException {
         Path runtimeCatalog = tempDirectory.resolve("data/runtime/catalog.tsv");
+        Path runtimePricing = runtimeCatalog.resolveSibling("pricing.tsv");
         StringWriter output = new StringWriter();
         StringWriter errorOutput = new StringWriter();
 
@@ -55,6 +56,7 @@ class MainTest {
         String displayedOutput = output.toString();
         assertAll(
                 () -> assertTrue(Files.exists(runtimeCatalog)),
+                () -> assertTrue(Files.exists(runtimePricing)),
                 () -> assertTrue(displayedOutput.contains("Welcome to CineCLI")),
                 () -> assertTrue(displayedOutput.contains("Press ENTER to proceed")),
                 () -> assertTrue(displayedOutput.contains("Orbit of Echoes")),
@@ -62,7 +64,9 @@ class MainTest {
                 () -> assertTrue(displayedOutput.contains("29 Aug 2026, 13:30")),
                 () -> assertEquals("", errorOutput.toString()),
                 () -> assertTrue(Files.readString(runtimeCatalog, UTF_8)
-                        .startsWith("CINECLI-CATALOG\t1")));
+                        .startsWith("CINECLI-CATALOG\t1")),
+                () -> assertTrue(Files.readString(runtimePricing, UTF_8)
+                        .startsWith("CINECLI-PRICING\t1")));
     }
 
     @Test

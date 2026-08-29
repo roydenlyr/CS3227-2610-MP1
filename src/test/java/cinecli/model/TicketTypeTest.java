@@ -8,14 +8,11 @@ import org.junit.jupiter.api.Test;
 
 class TicketTypeTest {
     @Test
-    void fixedTypes_haveExpectedNamesAndPrices() {
+    void fixedTypes_haveExpectedNames() {
         assertAll(
                 () -> assertEquals("Adult", TicketType.ADULT.getDisplayName()),
-                () -> assertEquals(1100, TicketType.ADULT.getPriceInCents()),
                 () -> assertEquals("Senior", TicketType.SENIOR.getDisplayName()),
-                () -> assertEquals(450, TicketType.SENIOR.getPriceInCents()),
-                () -> assertEquals("Student", TicketType.STUDENT.getDisplayName()),
-                () -> assertEquals(700, TicketType.STUDENT.getPriceInCents()));
+                () -> assertEquals("Student", TicketType.STUDENT.getDisplayName()));
     }
 
     @Test

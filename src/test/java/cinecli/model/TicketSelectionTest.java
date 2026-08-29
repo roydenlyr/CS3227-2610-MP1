@@ -8,14 +8,19 @@ import org.junit.jupiter.api.Test;
 
 class TicketSelectionTest {
     @Test
-    void constructor_validSeatAndType_created() {
+    void constructor_validSeatTypeAndPrice_createsPriceSnapshot() {
         SeatCoordinate seat = new SeatCoordinate('G', 4);
 
-        TicketSelection selection = new TicketSelection(seat, TicketType.STUDENT);
+        TicketSelection selection = new TicketSelection(seat, TicketType.STUDENT, 700);
 
         assertAll(
                 () -> assertEquals(seat, selection.seat()),
-                () -> assertEquals(TicketType.STUDENT, selection.ticketType()));
+                () -> assertEquals(TicketType.STUDENT, selection.ticketType()),
+                () -> assertEquals(700, selection.unitPriceInCents()),
+                () -> assertEquals(1,
+                        new TicketSelection(seat, TicketType.ADULT, 1).unitPriceInCents()),
+                () -> assertEquals(999_999,
+                        new TicketSelection(seat, TicketType.ADULT, 999_999).unitPriceInCents()));
     }
 
     @Test
@@ -24,8 +29,12 @@ class TicketSelectionTest {
 
         assertAll(
                 () -> assertThrows(NullPointerException.class,
-                        () -> new TicketSelection(null, TicketType.ADULT)),
+                        () -> new TicketSelection(null, TicketType.ADULT, 1100)),
                 () -> assertThrows(NullPointerException.class,
-                        () -> new TicketSelection(seat, null)));
+                        () -> new TicketSelection(seat, null, 1100)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new TicketSelection(seat, TicketType.ADULT, 0)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new TicketSelection(seat, TicketType.ADULT, 1_000_000)));
     }
 }

@@ -4,6 +4,7 @@ import cinecli.customer.parser.ScreeningSelection;
 import cinecli.customer.ui.CustomerUi;
 import cinecli.model.Bill;
 import cinecli.model.Movie;
+import cinecli.model.Pricing;
 import cinecli.model.PromoCode;
 import cinecli.model.Screening;
 import cinecli.model.SeatCoordinate;
@@ -13,7 +14,9 @@ import cinecli.model.TicketSelection;
 import cinecli.model.TicketType;
 import cinecli.storage.catalog.CatalogStorage;
 import cinecli.storage.exception.CatalogStorageException;
+import cinecli.storage.exception.PricingStorageException;
 import cinecli.storage.exception.SeatStorageException;
+import cinecli.storage.pricing.PricingStorage;
 import cinecli.storage.seat.SeatStorage;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,6 +39,7 @@ public final class CustomerApplication {
     private final CustomerUi customerUi;
     private final CatalogStorage catalogStorage;
     private final SeatStorage seatStorage;
+    private final PricingStorage pricingStorage;
 
     /**
      * Creates a customer workflow using the supplied UI and storage.
@@ -43,12 +47,17 @@ public final class CustomerApplication {
      * @param customerUi Customer-facing text UI.
      * @param catalogStorage Movie catalog storage.
      * @param seatStorage Temporary seat occupancy storage.
+     * @param pricingStorage Runtime pricing storage.
      */
     public CustomerApplication(
-            CustomerUi customerUi, CatalogStorage catalogStorage, SeatStorage seatStorage) {
+            CustomerUi customerUi,
+            CatalogStorage catalogStorage,
+            SeatStorage seatStorage,
+            PricingStorage pricingStorage) {
         this.customerUi = Objects.requireNonNull(customerUi);
         this.catalogStorage = Objects.requireNonNull(catalogStorage);
         this.seatStorage = Objects.requireNonNull(seatStorage);
+        this.pricingStorage = Objects.requireNonNull(pricingStorage);
     }
 
     /**
@@ -57,6 +66,14 @@ public final class CustomerApplication {
     public void run() {
         customerUi.showWelcome();
         if (!customerUi.hasUserProceeded()) {
+            return;
+        }
+
+        Pricing pricing;
+        try {
+            pricing = pricingStorage.load();
+        } catch (PricingStorageException exception) {
+            customerUi.showPricingStorageError(exception.getMessage());
             return;
         }
 
@@ -83,23 +100,23 @@ public final class CustomerApplication {
             return;
         }
 
-        Bill bill = requestBill(confirmedSeats);
+        Bill bill = requestBill(confirmedSeats, pricing);
         if (bill != null) {
             customerUi.showBill(
                     bill, selectedScreening.movie(), selectedScreening.screening());
         }
     }
 
-    private Bill requestBill(Set<SeatCoordinate> confirmedSeats) {
-        List<TicketSelection> ticketSelections = runTicketSelection(confirmedSeats);
+    private Bill requestBill(Set<SeatCoordinate> confirmedSeats, Pricing pricing) {
+        List<TicketSelection> ticketSelections = runTicketSelection(confirmedSeats, pricing);
         if (ticketSelections == null) {
             return null;
         }
-        List<SnackSelection> snackSelections = runSnackSelection();
+        List<SnackSelection> snackSelections = runSnackSelection(pricing);
         if (snackSelections == null) {
             return null;
         }
-        PromoSelection promoSelection = requestPromoCode();
+        PromoSelection promoSelection = requestPromoCode(pricing);
         if (promoSelection == null) {
             return null;
         }
@@ -205,11 +222,12 @@ public final class CustomerApplication {
         }
     }
 
-    private List<TicketSelection> runTicketSelection(Set<SeatCoordinate> confirmedSeats) {
-        customerUi.showTicketTypeMenu(TICKET_TYPES);
+    private List<TicketSelection> runTicketSelection(
+            Set<SeatCoordinate> confirmedSeats, Pricing pricing) {
+        customerUi.showTicketTypeMenu(TICKET_TYPES, pricing);
         List<TicketSelection> selections = new ArrayList<>();
         for (SeatCoordinate seat : confirmedSeats.stream().sorted().toList()) {
-            TicketSelection selection = requestTicketSelection(seat);
+            TicketSelection selection = requestTicketSelection(seat, pricing);
             if (selection == null) {
                 return null;
             }
@@ -221,7 +239,7 @@ public final class CustomerApplication {
         return completedSelections;
     }
 
-    private TicketSelection requestTicketSelection(SeatCoordinate seat) {
+    private TicketSelection requestTicketSelection(SeatCoordinate seat, Pricing pricing) {
         while (true) {
             String input = customerUi.requestTicketType(seat);
             if (input == null) {
@@ -229,15 +247,17 @@ public final class CustomerApplication {
             }
 
             try {
-                return new TicketSelection(seat, TicketType.parse(input));
+                TicketType ticketType = TicketType.parse(input);
+                return new TicketSelection(
+                        seat, ticketType, pricing.ticketPriceInCents(ticketType));
             } catch (IllegalArgumentException exception) {
                 customerUi.showTicketTypeError(exception.getMessage());
             }
         }
     }
 
-    private List<SnackSelection> runSnackSelection() {
-        customerUi.showSnackMenu(SNACK_MENU_ITEMS);
+    private List<SnackSelection> runSnackSelection(Pricing pricing) {
+        customerUi.showSnackMenu(SNACK_MENU_ITEMS, pricing);
         Map<SnackMenuItem, SnackSelection> selections = new LinkedHashMap<>();
         while (true) {
             String input = customerUi.requestSnackSelection();
@@ -257,7 +277,7 @@ public final class CustomerApplication {
 
             try {
                 SnackMenuItem menuItem = SnackMenuItem.parse(input);
-                SnackSelection selection = requestSnackQuantity(menuItem);
+                SnackSelection selection = requestSnackQuantity(menuItem, pricing);
                 if (selection == null) {
                     return null;
                 }
@@ -274,9 +294,9 @@ public final class CustomerApplication {
         }
     }
 
-    private PromoSelection requestPromoCode() {
+    private PromoSelection requestPromoCode(Pricing pricing) {
         while (true) {
-            String input = customerUi.requestPromoCode();
+            String input = customerUi.requestPromoCode(pricing.promotions());
             if (input == null) {
                 return null;
             }
@@ -285,14 +305,20 @@ public final class CustomerApplication {
             }
 
             try {
-                return new PromoSelection(Optional.of(PromoCode.parse(input)));
+                String normalizedCode = new PromoCode(input, 1).code();
+                Optional<PromoCode> promotion = pricing.findPromotion(normalizedCode);
+                if (promotion.isEmpty()) {
+                    throw new IllegalArgumentException("promo code " + normalizedCode
+                            + " is not available");
+                }
+                return new PromoSelection(promotion);
             } catch (IllegalArgumentException exception) {
                 customerUi.showPromoCodeError(exception.getMessage());
             }
         }
     }
 
-    private SnackSelection requestSnackQuantity(SnackMenuItem menuItem) {
+    private SnackSelection requestSnackQuantity(SnackMenuItem menuItem, Pricing pricing) {
         while (true) {
             String input = customerUi.requestSnackQuantity(menuItem);
             if (input == null) {
@@ -300,7 +326,10 @@ public final class CustomerApplication {
             }
 
             try {
-                return new SnackSelection(menuItem, SnackSelection.parseQuantity(input));
+                return new SnackSelection(
+                        menuItem,
+                        SnackSelection.parseQuantity(input),
+                        pricing.snackPriceInCents(menuItem));
             } catch (IllegalArgumentException exception) {
                 customerUi.showSnackQuantityError(exception.getMessage());
             }

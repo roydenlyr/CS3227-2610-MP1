@@ -3,6 +3,7 @@ package cinecli.customer.ui;
 import cinecli.customer.parser.ScreeningSelection;
 import cinecli.model.Bill;
 import cinecli.model.Movie;
+import cinecli.model.Pricing;
 import cinecli.model.PromoCode;
 import cinecli.model.Screening;
 import cinecli.model.SeatCoordinate;
@@ -186,15 +187,17 @@ public final class CustomerUi {
      * Shows the fixed customer ticket types and prices.
      *
      * @param ticketTypes Ticket types in display order.
+     * @param pricing Pricing that supplies the displayed prices.
      */
-    public void showTicketTypeMenu(List<TicketType> ticketTypes) {
+    public void showTicketTypeMenu(List<TicketType> ticketTypes, Pricing pricing) {
         Objects.requireNonNull(ticketTypes);
+        Objects.requireNonNull(pricing);
         output.println();
         output.println("Ticket Types");
         for (TicketType ticketType : ticketTypes) {
             output.println(ticketType.getMenuNumber() + ". "
                     + ticketType.getDisplayName() + " - "
-                    + formatPrice(ticketType.getPriceInCents()));
+                    + formatPrice(pricing.ticketPriceInCents(ticketType)));
         }
     }
 
@@ -237,13 +240,15 @@ public final class CustomerUi {
      * Shows the fixed snack and combo menu.
      *
      * @param menuItems Snack and combo items in display order.
+     * @param pricing Pricing that supplies the displayed prices.
      */
-    public void showSnackMenu(List<SnackMenuItem> menuItems) {
+    public void showSnackMenu(List<SnackMenuItem> menuItems, Pricing pricing) {
         Objects.requireNonNull(menuItems);
+        Objects.requireNonNull(pricing);
         output.println();
         output.println("Snack and Combo Menu");
-        showSnackMenuSection("Snacks", menuItems, false);
-        showSnackMenuSection("Combos", menuItems, true);
+        showSnackMenuSection("Snacks", menuItems, false, pricing);
+        showSnackMenuSection("Combos", menuItems, true, pricing);
         output.println("0. Finish selection (or skip if none selected)");
     }
 
@@ -332,12 +337,14 @@ public final class CustomerUi {
     /**
      * Requests an optional promotion code.
      *
+     * @param promotions Promotions available to apply.
      * @return Submitted code, a blank line to skip, or null if input ended or could not be read.
      */
-    public String requestPromoCode() {
+    public String requestPromoCode(List<PromoCode> promotions) {
+        Objects.requireNonNull(promotions);
         output.println();
-        output.println("Enter a promo code (CS2103 for 20% off or CS3227 for 99% off),"
-                + " or press ENTER to skip:");
+        output.println("Enter a promo code (" + formatPromotions(promotions)
+                + "), or press ENTER to skip:");
         return readLine();
     }
 
@@ -390,7 +397,7 @@ public final class CustomerUi {
             showBillTableRow(
                     selection.seat().toString(),
                     ticketType.getDisplayName(),
-                    formatPrice(ticketType.getPriceInCents()));
+                    formatPrice(selection.unitPriceInCents()));
         }
         output.println(BILL_SECTION_RULE);
         showBillLabelValue(
@@ -421,9 +428,9 @@ public final class CustomerUi {
         output.println(BILL_SECTION_RULE);
         if (bill.promoCode().isPresent()) {
             PromoCode promoCode = bill.promoCode().orElseThrow();
-            showBillLabelValue("Promo Code:", promoCode.getCode());
+            showBillLabelValue("Promo Code:", promoCode.code());
             showBillLabelValue(
-                    "Discount:", promoCode.getDiscountPercentage() + "% OFF");
+                    "Discount:", promoCode.discountPercentage() + "% OFF");
         } else {
             showBillLabelValue("Promo Code:", "None");
             showBillLabelValue("Discount:", "0% OFF");
@@ -451,7 +458,7 @@ public final class CustomerUi {
         showBillTableRow(
                 Integer.toString(selection.quantity()),
                 itemName,
-                formatPrice(selection.menuItem().getPriceInCents()));
+                formatPrice(selection.unitPriceInCents()));
         if (descriptionIndex >= 0) {
             output.printf(Locale.ROOT, "%12s%s%n", "", displayName.substring(descriptionIndex + 1));
         }
@@ -480,6 +487,15 @@ public final class CustomerUi {
      */
     public void showSeatStorageError(String message) {
         errorOutput.println("Unable to load or update seat availability: " + message);
+    }
+
+    /**
+     * Shows a pricing data failure without exposing a stack trace.
+     *
+     * @param message User-readable failure explanation.
+     */
+    public void showPricingStorageError(String message) {
+        errorOutput.println("Unable to load pricing: " + message);
     }
 
     /**
@@ -561,28 +577,40 @@ public final class CustomerUi {
     }
 
     private void showSnackMenuSection(
-            String heading, List<SnackMenuItem> menuItems, boolean isCombo) {
+            String heading, List<SnackMenuItem> menuItems, boolean isCombo, Pricing pricing) {
         output.println(heading + ":");
         for (SnackMenuItem menuItem : menuItems) {
             if (menuItem.isCombo() == isCombo) {
-                output.println(menuItem.getMenuNumber() + ". " + formatSnackMenuItem(menuItem));
+                output.println(menuItem.getMenuNumber() + ". "
+                        + formatSnackMenuItem(menuItem, pricing));
             }
         }
     }
 
-    private String formatSnackMenuItem(SnackMenuItem menuItem) {
-        return menuItem.getDisplayName() + " - " + formatPrice(menuItem.getPriceInCents());
+    private String formatSnackMenuItem(SnackMenuItem menuItem, Pricing pricing) {
+        return menuItem.getDisplayName() + " - "
+                + formatPrice(pricing.snackPriceInCents(menuItem));
     }
 
     private String formatSnackSelection(SnackSelection selection) {
         return selection.quantity() + " x " + selection.menuItem().getDisplayName()
-                + " - " + formatPrice(selection.menuItem().getPriceInCents()) + " each";
+                + " - " + formatPrice(selection.unitPriceInCents()) + " each";
     }
 
     private String formatTicketSelection(TicketSelection selection) {
         TicketType ticketType = selection.ticketType();
         return selection.seat() + ": " + ticketType.getDisplayName()
-                + " - " + formatPrice(ticketType.getPriceInCents());
+                + " - " + formatPrice(selection.unitPriceInCents());
+    }
+
+    private String formatPromotions(List<PromoCode> promotions) {
+        if (promotions.isEmpty()) {
+            return "no promotions are currently available";
+        }
+        return promotions.stream()
+                .map(promotion -> promotion.code() + " for "
+                        + promotion.discountPercentage() + "% off")
+                .collect(Collectors.joining(" or "));
     }
 
     private String formatPrice(long priceInCents) {

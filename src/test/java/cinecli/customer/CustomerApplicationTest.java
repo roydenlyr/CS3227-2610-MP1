@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cinecli.customer.ui.CustomerUi;
 import cinecli.storage.catalog.CatalogStorage;
+import cinecli.storage.pricing.PricingStorage;
 import cinecli.storage.seat.SeatStorage;
 import cinecli.storage.seat.SeatStorageTestSupport;
 import java.io.IOException;
@@ -71,6 +72,71 @@ class CustomerApplicationTest {
                 () -> assertTrue(applicationOutput.normalOutput().contains("Welcome to CineCLI")),
                 () -> assertFalse(Files.exists(applicationOutput.runtimeSeats())),
                 () -> assertEquals("", applicationOutput.errorOutput()));
+    }
+
+    @Test
+    void run_malformedPricing_reportsFailureBeforeSeatStorageIsAccessed() throws IOException {
+        Path runtimeCatalog = tempDirectory.resolve("catalog.tsv");
+        Path runtimeSeats = tempDirectory.resolve("seats.tsv");
+        Path runtimePricing = tempDirectory.resolve("pricing.tsv");
+        Files.writeString(runtimeCatalog, singleScreeningCatalog(), UTF_8);
+        Files.writeString(runtimePricing, "not valid pricing\n", UTF_8);
+        StringWriter normalOutput = new StringWriter();
+        StringWriter errorOutput = new StringWriter();
+
+        new CustomerApplication(
+                new CustomerUi(new StringReader("\n"), normalOutput, errorOutput),
+                new CatalogStorage(runtimeCatalog, DEFAULT_RESOURCE),
+                new SeatStorage(runtimeSeats),
+                new PricingStorage(runtimePricing)).run();
+
+        assertAll(
+                () -> assertTrue(errorOutput.toString().contains("Unable to load pricing:")),
+                () -> assertFalse(normalOutput.toString().contains("Movie Catalog")),
+                () -> assertFalse(Files.exists(runtimeSeats)),
+                () -> assertEquals("not valid pricing\n", Files.readString(runtimePricing, UTF_8)));
+    }
+
+    @Test
+    void run_customPricing_capturesAndRendersLoadedPrices() throws IOException {
+        Path runtimeCatalog = tempDirectory.resolve("catalog.tsv");
+        Path runtimeSeats = tempDirectory.resolve("seats.tsv");
+        Path runtimePricing = tempDirectory.resolve("pricing.tsv");
+        Files.writeString(runtimeCatalog, singleScreeningCatalog(), UTF_8);
+        Files.writeString(runtimePricing, """
+                CINECLI-PRICING\t1
+                TICKET_PRICE\tADULT\t12.34
+                TICKET_PRICE\tSENIOR\t4.50
+                TICKET_PRICE\tSTUDENT\t7.00
+                SNACK_PRICE\tPOPCORN\t6.78
+                SNACK_PRICE\tNACHOS\t6.00
+                SNACK_PRICE\tSOFT_DRINK\t3.00
+                SNACK_PRICE\tPOPCORN_COMBO\t7.00
+                SNACK_PRICE\tNACHOS_COMBO\t8.00
+                PROMOTION\tSAVE\t25
+                """, UTF_8);
+        StringWriter normalOutput = new StringWriter();
+        StringWriter errorOutput = new StringWriter();
+
+        new CustomerApplication(
+                new CustomerUi(
+                        new StringReader("\n1A\nA1\nY\n1\n1\n2\n0\nsave\n"),
+                        normalOutput,
+                        errorOutput),
+                new CatalogStorage(runtimeCatalog, DEFAULT_RESOURCE),
+                new SeatStorage(runtimeSeats),
+                new PricingStorage(runtimePricing)).run();
+
+        assertAll(
+                () -> assertTrue(normalOutput.toString().contains("1. Adult - S$12.34")),
+                () -> assertTrue(normalOutput.toString().contains("1. Popcorn - S$6.78")),
+                () -> assertTrue(normalOutput.toString().contains(
+                        "- A1: Adult - S$12.34")),
+                () -> assertTrue(normalOutput.toString().contains(
+                        "- 2 x Popcorn - S$6.78 each")),
+                () -> assertTrue(hasBillLine(normalOutput.toString(), "Promo Code:", "SAVE")),
+                () -> assertTrue(hasBillLine(normalOutput.toString(), "TOTAL:", "S$19.43")),
+                () -> assertEquals("", errorOutput.toString()));
     }
 
     @Test
@@ -169,7 +235,8 @@ class CustomerApplicationTest {
         new CustomerApplication(
                 customerUi,
                 new CatalogStorage(runtimeCatalog, DEFAULT_RESOURCE),
-                SeatStorageTestSupport.failingReplacement(runtimeSeats)).run();
+                SeatStorageTestSupport.failingReplacement(runtimeSeats),
+                new PricingStorage(tempDirectory.resolve("pricing.tsv"))).run();
 
         assertAll(
                 () -> assertTrue(errorOutput.toString().contains(
@@ -427,7 +494,7 @@ class CustomerApplicationTest {
                         "No snacks or combos selected.")),
                 () -> assertFalse(secondRun.normalOutput().contains(
                         "- 2 x Soft Drink - S$3.00 each")),
-                () -> assertEquals(Set.of("catalog.tsv", "seats.tsv"), runtimeFileNames),
+                () -> assertEquals(Set.of("catalog.tsv", "pricing.tsv", "seats.tsv"), runtimeFileNames),
                 () -> assertEquals("", firstRun.errorOutput()),
                 () -> assertEquals("", secondRun.errorOutput()));
     }
@@ -586,7 +653,7 @@ class CustomerApplicationTest {
         assertAll(
                 () -> assertEquals(2, promoErrors.size()),
                 () -> assertTrue(promoErrors.stream().allMatch(line -> line.contains(
-                        "promo code must be CS2103 or CS3227"))),
+                        "is not available"))),
                 () -> assertEquals(3, promoPromptCount),
                 () -> assertTrue(hasBillLine(
                         applicationOutput.normalOutput(), "Subtotal:", "S$4.50")),
@@ -632,8 +699,9 @@ class CustomerApplicationTest {
                 new StringReader(input), normalOutput, errorOutput);
         CatalogStorage catalogStorage = new CatalogStorage(runtimeCatalog, DEFAULT_RESOURCE);
         SeatStorage seatStorage = new SeatStorage(runtimeSeats);
+        PricingStorage pricingStorage = new PricingStorage(tempDirectory.resolve("pricing.tsv"));
 
-        new CustomerApplication(customerUi, catalogStorage, seatStorage).run();
+        new CustomerApplication(customerUi, catalogStorage, seatStorage, pricingStorage).run();
         return new ApplicationOutput(
                 normalOutput.toString(), errorOutput.toString(), runtimeSeats);
     }

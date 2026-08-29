@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import cinecli.model.Bill;
 import cinecli.model.ContentRating;
 import cinecli.model.Movie;
+import cinecli.model.Pricing;
 import cinecli.model.PromoCode;
 import cinecli.model.Screening;
 import cinecli.model.SeatCoordinate;
@@ -59,10 +60,12 @@ class CustomerUiTest {
 
         customerUi.showNoSeatsAvailable();
         customerUi.showSeatStorageError("disk unavailable");
+        customerUi.showPricingStorageError("pricing unavailable");
 
         assertAll(
                 () -> assertTrue(output.toString().contains("No seats are available")),
-                () -> assertTrue(error.toString().contains("disk unavailable")));
+                () -> assertTrue(error.toString().contains("disk unavailable")),
+                () -> assertTrue(error.toString().contains("pricing unavailable")));
     }
     @Test
     void showCatalog_multipleScreenings_labelsTimingsWithLetters() {
@@ -127,7 +130,7 @@ class CustomerUiTest {
         StringWriter output = new StringWriter();
         CustomerUi customerUi = createUi(output);
 
-        customerUi.showTicketTypeMenu(List.of(TicketType.values()));
+        customerUi.showTicketTypeMenu(List.of(TicketType.values()), Pricing.defaults());
 
         List<String> nonblankLines = output.toString().lines()
                 .filter(line -> !line.isBlank())
@@ -159,8 +162,8 @@ class CustomerUiTest {
         CustomerUi customerUi = createUi(output);
 
         customerUi.showTicketSelections(List.of(
-                new TicketSelection(new SeatCoordinate('G', 4), TicketType.ADULT),
-                new TicketSelection(new SeatCoordinate('G', 5), TicketType.SENIOR)));
+                new TicketSelection(new SeatCoordinate('G', 4), TicketType.ADULT, 1100),
+                new TicketSelection(new SeatCoordinate('G', 5), TicketType.SENIOR, 450)));
 
         List<String> nonblankLines = output.toString().lines()
                 .filter(line -> !line.isBlank())
@@ -178,12 +181,22 @@ class CustomerUiTest {
         StringWriter output = new StringWriter();
         CustomerUi customerUi = createUi(output);
 
-        customerUi.requestPromoCode();
+        customerUi.requestPromoCode(Pricing.defaults().promotions());
 
         assertEquals(
                 "Enter a promo code (CS2103 for 20% off or CS3227 for 99% off),"
                         + " or press ENTER to skip:",
                 output.toString().strip());
+    }
+
+    @Test
+    void requestPromoCode_noPromotionsExplainsThatNoneAreAvailable() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.requestPromoCode(List.of());
+
+        assertTrue(output.toString().contains("no promotions are currently available"));
     }
 
     @Test
@@ -195,13 +208,13 @@ class CustomerUiTest {
         Bill bill = new Bill(
                 List.of(
                         new TicketSelection(
-                                new SeatCoordinate('G', 4), TicketType.ADULT),
+                                new SeatCoordinate('G', 4), TicketType.ADULT, 1100),
                         new TicketSelection(
-                                new SeatCoordinate('G', 5), TicketType.SENIOR)),
+                                new SeatCoordinate('G', 5), TicketType.SENIOR, 450)),
                 List.of(
-                        new SnackSelection(SnackMenuItem.POPCORN_COMBO, 2),
-                        new SnackSelection(SnackMenuItem.NACHOS, 3)),
-                Optional.of(PromoCode.CS2103));
+                        new SnackSelection(SnackMenuItem.POPCORN_COMBO, 2, 700),
+                        new SnackSelection(SnackMenuItem.NACHOS, 3, 600)),
+                Optional.of(new PromoCode("CS2103", 20)));
 
         customerUi.showBill(bill, movie, screening);
 
@@ -252,9 +265,9 @@ class CustomerUiTest {
         CustomerUi customerUi = createUi(output);
         Bill bill = new Bill(
                 List.of(new TicketSelection(
-                        new SeatCoordinate('A', 1), TicketType.ADULT)),
+                        new SeatCoordinate('A', 1), TicketType.ADULT, 1100)),
                 List.of(new SnackSelection(
-                        SnackMenuItem.NACHOS_COMBO, Integer.MAX_VALUE)));
+                        SnackMenuItem.NACHOS_COMBO, Integer.MAX_VALUE, 800)));
 
         customerUi.showBill(bill, createBillMovie(), createBillScreening());
 
@@ -274,7 +287,7 @@ class CustomerUiTest {
         StringWriter output = new StringWriter();
         CustomerUi customerUi = createUi(output);
 
-        customerUi.showSnackMenu(List.of(SnackMenuItem.values()));
+        customerUi.showSnackMenu(List.of(SnackMenuItem.values()), Pricing.defaults());
 
         List<String> nonblankLines = output.toString().lines()
                 .filter(line -> !line.isBlank())
@@ -311,7 +324,7 @@ class CustomerUiTest {
         CustomerUi customerUi = createUi(output);
 
         customerUi.showSnackSelectionAdded(
-                new SnackSelection(SnackMenuItem.NACHOS_COMBO, 2));
+                new SnackSelection(SnackMenuItem.NACHOS_COMBO, 2, 800));
 
         assertEquals(
                 "Snack/combo added: 2 x Nachos Combo (Nachos + Soft Drink) - S$8.00 each",
@@ -324,8 +337,8 @@ class CustomerUiTest {
         CustomerUi customerUi = createUi(output);
 
         customerUi.showSnackSelections(List.of(
-                new SnackSelection(SnackMenuItem.POPCORN_COMBO, 2),
-                new SnackSelection(SnackMenuItem.NACHOS, 3)));
+                new SnackSelection(SnackMenuItem.POPCORN_COMBO, 2, 700),
+                new SnackSelection(SnackMenuItem.NACHOS, 3, 600)));
 
         List<String> nonblankLines = output.toString().lines()
                 .filter(line -> !line.isBlank())

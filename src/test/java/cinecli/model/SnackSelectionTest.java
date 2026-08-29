@@ -8,12 +8,18 @@ import org.junit.jupiter.api.Test;
 
 class SnackSelectionTest {
     @Test
-    void constructor_positiveQuantity_createsSelection() {
-        SnackSelection selection = new SnackSelection(SnackMenuItem.POPCORN, 2);
+    void constructor_positiveQuantityAndPrice_createsPriceSnapshot() {
+        SnackSelection selection = new SnackSelection(SnackMenuItem.POPCORN, 2, 500);
 
         assertAll(
                 () -> assertEquals(SnackMenuItem.POPCORN, selection.menuItem()),
-                () -> assertEquals(2, selection.quantity()));
+                () -> assertEquals(2, selection.quantity()),
+                () -> assertEquals(500, selection.unitPriceInCents()),
+                () -> assertEquals(1,
+                        new SnackSelection(SnackMenuItem.POPCORN, 1, 1).unitPriceInCents()),
+                () -> assertEquals(999_999,
+                        new SnackSelection(SnackMenuItem.POPCORN, 1, 999_999)
+                                .unitPriceInCents()));
     }
 
     @Test
@@ -21,13 +27,19 @@ class SnackSelectionTest {
         assertAll(
                 () -> assertThrows(
                         NullPointerException.class,
-                        () -> new SnackSelection(null, 1)),
+                        () -> new SnackSelection(null, 1, 500)),
                 () -> assertThrows(
                         IllegalArgumentException.class,
-                        () -> new SnackSelection(SnackMenuItem.POPCORN, 0)),
+                        () -> new SnackSelection(SnackMenuItem.POPCORN, 0, 500)),
                 () -> assertThrows(
                         IllegalArgumentException.class,
-                        () -> new SnackSelection(SnackMenuItem.POPCORN, -1)));
+                        () -> new SnackSelection(SnackMenuItem.POPCORN, -1, 500)),
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> new SnackSelection(SnackMenuItem.POPCORN, 1, 0)),
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> new SnackSelection(SnackMenuItem.POPCORN, 1, 1_000_000)));
     }
 
     @Test

@@ -8,29 +8,40 @@ import org.junit.jupiter.api.Test;
 
 class PromoCodeTest {
     @Test
-    void fixedCodes_haveExpectedDiscountPercentages() {
+    void constructor_validCodeAndPercentage_canonicalizesCode() {
+        PromoCode promotion = new PromoCode(" cs2103-early_bird ", 20);
+
         assertAll(
-                () -> assertEquals("CS2103", PromoCode.CS2103.getCode()),
-                () -> assertEquals(20, PromoCode.CS2103.getDiscountPercentage()),
-                () -> assertEquals("CS3227", PromoCode.CS3227.getCode()),
-                () -> assertEquals(99, PromoCode.CS3227.getDiscountPercentage()));
+                () -> assertEquals("CS2103-EARLY_BIRD", promotion.code()),
+                () -> assertEquals(20, promotion.discountPercentage()));
     }
 
     @Test
-    void parse_supportedCodes_ignoresCaseAndSurroundingWhitespace() {
+    void constructor_codeBoundaryValues_created() {
         assertAll(
-                () -> assertEquals(PromoCode.CS2103, PromoCode.parse(" cs2103 ")),
-                () -> assertEquals(PromoCode.CS3227, PromoCode.parse("Cs3227")));
+                () -> assertEquals("A", new PromoCode("a", 1).code()),
+                () -> assertEquals("A1234567890123456789012345678901",
+                        new PromoCode("a1234567890123456789012345678901", 100).code()));
     }
 
     @Test
-    void parse_blankOrUnsupportedCode_exceptionThrown() {
+    void constructor_invalidCodeOrPercentage_exceptionThrown() {
         assertAll(
                 () -> assertThrows(IllegalArgumentException.class,
-                        () -> PromoCode.parse("")),
+                        () -> new PromoCode("", 20)),
                 () -> assertThrows(IllegalArgumentException.class,
-                        () -> PromoCode.parse("SAVE20")),
+                        () -> new PromoCode("-SAVE20", 20)),
                 () -> assertThrows(IllegalArgumentException.class,
-                        () -> PromoCode.parse("CS21030")));
+                        () -> new PromoCode("SAVE 20", 20)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new PromoCode("\u03a9MEGA", 20)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new PromoCode("A12345678901234567890123456789012", 20)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new PromoCode("CS2103", 0)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new PromoCode("CS2103", 101)),
+                () -> assertThrows(NullPointerException.class,
+                        () -> new PromoCode(null, 20)));
     }
 }

@@ -10,26 +10,21 @@ import org.junit.jupiter.api.Test;
 
 class SnackMenuItemTest {
     @Test
-    void fixedMenu_itemsHaveExpectedNamesCategoriesAndPrices() {
+    void fixedMenu_itemsHaveExpectedNamesAndCategories() {
         assertAll(
                 () -> assertEquals("Popcorn", SnackMenuItem.POPCORN.getDisplayName()),
-                () -> assertEquals(500, SnackMenuItem.POPCORN.getPriceInCents()),
                 () -> assertFalse(SnackMenuItem.POPCORN.isCombo()),
                 () -> assertEquals("Nachos", SnackMenuItem.NACHOS.getDisplayName()),
-                () -> assertEquals(600, SnackMenuItem.NACHOS.getPriceInCents()),
                 () -> assertFalse(SnackMenuItem.NACHOS.isCombo()),
                 () -> assertEquals("Soft Drink", SnackMenuItem.SOFT_DRINK.getDisplayName()),
-                () -> assertEquals(300, SnackMenuItem.SOFT_DRINK.getPriceInCents()),
                 () -> assertFalse(SnackMenuItem.SOFT_DRINK.isCombo()),
                 () -> assertEquals(
                         "Popcorn Combo (Popcorn + Soft Drink)",
                         SnackMenuItem.POPCORN_COMBO.getDisplayName()),
-                () -> assertEquals(700, SnackMenuItem.POPCORN_COMBO.getPriceInCents()),
                 () -> assertTrue(SnackMenuItem.POPCORN_COMBO.isCombo()),
                 () -> assertEquals(
                         "Nachos Combo (Nachos + Soft Drink)",
                         SnackMenuItem.NACHOS_COMBO.getDisplayName()),
-                () -> assertEquals(800, SnackMenuItem.NACHOS_COMBO.getPriceInCents()),
                 () -> assertTrue(SnackMenuItem.NACHOS_COMBO.isCombo()));
     }
 

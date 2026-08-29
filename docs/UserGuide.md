@@ -9,9 +9,10 @@ bill. Each movie displays its content rating and lettered screening dates and
 times.
 
 Seat occupancy is stored temporarily until booking records become the source of
-truth. Ticket assignments, snack and combo choices, promo codes, and bills are
-session-only. Administration, payment, and complete booking records are not part
-of this milestone.
+truth. Global ticket, snack/combo, and promotion pricing is stored separately in
+runtime data. Ticket assignments, snack and combo choices, applied promo codes,
+and bills remain session-only price snapshots. Administration, payment, and
+complete booking records are not part of this milestone.
 
 ## Prerequisite
 
@@ -91,7 +92,9 @@ duplicate, or already-taken coordinates and asks for another selection.
 
 ## Choose a ticket type
 
-After seats are confirmed, CineCLI displays the fixed ticket menu:
+After seats are confirmed, CineCLI displays the fixed ticket identities with the
+prices loaded for the current session. A new runtime data directory receives the
+following seeded prices:
 
 ```text
 Ticket Types
@@ -108,7 +111,9 @@ seat before moving on.
 
 ## Choose a snack or combo
 
-After every confirmed seat has a ticket type, CineCLI displays this fixed menu:
+After every confirmed seat has a ticket type, CineCLI displays the fixed
+snack/combo identities with the prices loaded for the current session. A new
+runtime data directory receives the following seeded prices:
 
 ```text
 Snack and Combo Menu
@@ -141,7 +146,8 @@ a booking record.
 
 ## Apply a promo code and review the bill
 
-After snack selection, CineCLI accepts one optional promo code:
+After snack selection, CineCLI accepts one optional promo code. In a newly
+initialized runtime data directory, the available codes are:
 
 - `CS2103` applies 20% off the complete ticket-and-snack subtotal.
 - `CS3227` applies 99% off the complete ticket-and-snack subtotal.
@@ -219,10 +225,23 @@ as an empty, versioned seat occupancy file. Confirmed selections are stored by
 screening ID and seat coordinate. This file is temporary and will be replaced by
 booking-owned seat allocations when booking persistence is implemented.
 
-Ticket assignments, snack and combo choices, promo codes, and bills do not create
-or update a runtime data file.
+After the welcome screen and before CineCLI displays the catalog, a missing
+`data/runtime/pricing.tsv` is atomically seeded with the current default ticket,
+snack/combo, and promotion values. Later launches load the existing pricing file;
+they do not replace it. The menu and promo prompt show the values loaded at the
+start of the session.
 
-If either runtime file is malformed, CineCLI displays a clear error and does not
-use partial or invented data. A malformed file is not overwritten automatically.
-Restore valid data, or remove a malformed catalog if the bundled catalog defaults
-should be recreated on the next launch.
+The price attached to each ticket or snack/combo selection, and the code and
+percentage of an applied promotion, are captured when selected. A later pricing
+change therefore cannot alter an already-created selection or bill.
+
+Ticket assignments, snack and combo choices, applied promo codes, and bills do
+not create additional runtime data files.
+
+If a catalog, pricing, or seat file is malformed, CineCLI displays a clear error
+and does not use partial or invented data. A malformed file is not overwritten
+automatically. A pricing failure ends the customer session before catalog or seat
+state is accessed, so it cannot initialize or alter `seats.tsv`. Restore valid
+data, or remove a malformed catalog if the bundled catalog defaults should be
+recreated on the next launch. See `data/README.md` for the supported
+`pricing.tsv` format.

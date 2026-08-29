@@ -5,9 +5,10 @@
 This repository implements a customer vertical slice from the welcome screen to
 catalog display, screening selection, terminal seat selection, ticket demographic
 selection, optional snacks and combos, optional promotion input, and an itemized
-bill. Catalog and temporary seat occupancy data are strictly validated and
-persisted as versioned plain text. Ticket, snack, promotion, and bill data remain
-session-only; payment, booking persistence, and administration remain deferred.
+bill. Catalog, global pricing, and temporary seat occupancy data are strictly
+validated and persisted as versioned plain text. Ticket, snack, promotion, and
+bill selections remain session-only snapshots; payment, booking persistence, and
+administration remain deferred.
 
 ## Toolchain
 
@@ -53,15 +54,19 @@ java -jar target/cinecli-0.1.0-SNAPSHOT.jar
 
 The implemented responsibilities are intentionally small:
 
-- `Main` wires UTF-8 system streams, runtime paths, the UI, and storage.
-- `CustomerApplication` coordinates catalog selection, seat-selection rules,
-  confirmation, ticket and snack selection, promo input, bill creation, and
-  graceful storage failure.
+- `Main` wires UTF-8 system streams, catalog, seat, and pricing runtime paths,
+  the UI, and storage.
+- `CustomerApplication` loads pricing after the welcome step and, when that
+  succeeds, coordinates catalog selection, seat-selection rules, confirmation,
+  ticket and snack selection, promo input, bill creation, and graceful storage
+  failure.
 - `CustomerUi` owns customer-facing input prompts and output formatting, including
   the fixed terminal seat map, menus, and four-section itemized bill.
 - `Movie`, `Screening`, `ContentRating`, `ScreeningSelection`, `SeatCoordinate`,
-  `TicketType`, `TicketSelection`, `SnackMenuItem`, `SnackSelection`, `PromoCode`,
-  and `Bill` represent immutable domain, selection, and billing data.
+  `TicketType`, `SnackMenuItem`, `Pricing`, `TicketSelection`, `SnackSelection`,
+  `PromoCode`, and `Bill` represent immutable domain, pricing, selection, and
+  billing data. `TicketType` and `SnackMenuItem` are fixed identities; their
+  prices are supplied by `Pricing`.
 - `CatalogStorage` initializes missing runtime data and reads the file.
 - `CatalogParser` strictly parses and validates the versioned text format before
   returning any movies.
@@ -69,6 +74,10 @@ The implemented responsibilities are intentionally small:
   occupancy data.
 - `SeatParser` strictly validates all temporary occupancy records before any seat
   state is returned or updated.
+- `PricingStorage` seeds a missing runtime pricing file, validates and loads a
+  complete pricing state, and atomically replaces complete saved pricing.
+- `PricingParser` strictly validates `pricing.tsv` version 1 before any state is
+  returned.
 
 No booking or checkout persistence, payment processing, administration layer, or
 production dependency has been introduced. The temporary seat writer is
@@ -80,13 +89,14 @@ changing the terminal map.
 JUnit tests use injected readers, writers, and temporary directories. They cover
 the welcome-to-bill workflow, screening code parsing, exact seat-map orientation,
 tentative selection, confirmation and cancellation, occupied-seat rejection,
-deterministic seat-to-ticket assignment, all ticket prices, ticket retries, the
-exact snack menu and prices, multiple snack and combo choices, quantity boundaries,
-repeated-item replacement, promo parsing and retries, aggregate discounts,
-half-cent rounding, checked long-cent arithmetic, exact receipt sections and
-columns, combo-description wrapping, grouped large currency amounts, session
-isolation, strict catalog and seat validation, deterministic seat writes, and
-missing-file initialization.
+deterministic seat-to-ticket assignment, persisted custom ticket and snack prices,
+ticket retries, multiple snack and combo choices, quantity boundaries,
+repeated-item replacement, persisted promotion parsing and retries, aggregate
+discounts, half-cent rounding, checked long-cent arithmetic, exact receipt
+sections and columns, combo-description wrapping, grouped large currency amounts,
+session isolation, strict catalog, pricing, and seat validation, deterministic
+pricing and seat writes, missing-file initialization, atomic-write failures, and
+preservation of existing data bytes on failure.
 Tests never read or write the real `data/runtime` directory.
 
 Run the complete build with `clean verify` before considering an implementation
@@ -105,17 +115,20 @@ Previously taken seats and tentative session selections both render as `X`.
 Tentative seats are written only after the user confirms them with `Y`; declining
 clears them and returns to the original persisted map.
 
-After seat persistence succeeds, confirmed coordinates are sorted and each is
-paired with exactly one `TicketType` in an immutable `TicketSelection`. The fixed
-enum values are Adult at 1,100 cents, Senior at 450 cents, and Student at 700
-cents. `TicketType` parses menu numbers, while `CustomerApplication` owns the
-per-seat retry loop. No ticket prompt is shown if seat selection does not complete.
+After a customer proceeds from the welcome screen, `CustomerApplication` loads
+the immutable `Pricing` state before it loads the catalog or accesses seat
+storage. A pricing read, validation, or seed failure is reported and ends the
+session, leaving seat state untouched. The fixed ticket identities are parsed by
+`TicketType`, while their menu values are read from `Pricing`. After seat
+persistence succeeds, each sorted coordinate is paired with an immutable
+`TicketSelection` that captures the price supplied by the session pricing state.
+No ticket prompt is shown if seat selection does not complete.
 
-After every ticket type is selected, the application displays a fixed in-memory
-menu of three individual items and two combos. Menu numbers are parsed by
-`SnackMenuItem`; exact prices are stored as Singapore cents and formatted by the
-UI with two decimal places. Each selected item is paired with a positive
-whole-number quantity in an immutable `SnackSelection`.
+After every ticket type is selected, the application displays three fixed snack
+identities and two fixed combo identities. Menu numbers are parsed by
+`SnackMenuItem`; the current session's exact cent prices are read from `Pricing`
+and formatted by the UI. Each selected item is paired with a positive whole-number
+quantity and captured unit price in an immutable `SnackSelection`.
 
 The application keeps selections in original selection order and keys them by
 menu item. A customer can therefore add multiple a la carte items and combos, while
@@ -127,18 +140,21 @@ prompts. No snack menu is shown when seat selection or ticket selection is
 cancelled, incomplete, unavailable, or fails to persist.
 
 The promotion prompt accepts a blank line as an explicit skip. Nonblank input is
-trimmed, normalized case-insensitively, and parsed by `PromoCode`; invalid values
-return to the same prompt. `CS2103` stores a 20% discount and `CS3227` stores a 99%
-discount. Exactly one optional code is passed to the bill, so discounts cannot
-stack.
+trimmed and normalized case-insensitively before lookup in the loaded `Pricing`
+state; invalid values return to the same prompt. A matched immutable `PromoCode`
+captures the canonical code and percentage. The seeded state provides `CS2103` at
+20% and `CS3227` at 99%, but an existing valid pricing file determines the
+available promotions. Exactly one optional code is passed to the bill, so
+discounts cannot stack.
 
 `Bill` takes defensive copies of the ticket and snack selections and keeps the
-optional promo code. It calculates ticket and quantity-aware snack subtotals with
-checked `long`-cent arithmetic, then applies the discount to their aggregate. The
-final payable amount is rounded to the nearest cent with half cents rounded up;
-the discount shown is the exact difference between the pre-discount subtotal and
-that rounded payable amount. `CustomerUi` formats these domain results and does not
-implement monetary rules.
+optional promotion snapshot. It calculates ticket and quantity-aware snack
+subtotals only from their captured cent prices, then applies the captured discount
+percentage to their aggregate. A later change to global pricing cannot change the
+in-memory selections or bill. The final payable amount is rounded to the nearest
+cent with half cents rounded up; the discount shown is the exact difference between
+the pre-discount subtotal and that rounded payable amount. `CustomerUi` formats
+these domain results and does not implement monetary rules.
 
 `CustomerApplication` passes the selected `Movie` and `Screening` to the final UI
 call so receipt context does not become part of the arithmetic-focused `Bill`
@@ -180,6 +196,35 @@ Only a missing runtime file triggers initialization from the bundled resource.
 Valid empty or malformed existing files are not overwritten. Parsing validates the
 whole file before the UI receives data, preventing partial catalog display.
 
+The runtime pricing file is `data/runtime/pricing.tsv`, resolved relative to the
+process working directory. It is a UTF-8, tab-separated, versioned file:
+
+```text
+CINECLI-PRICING<TAB>1
+TICKET_PRICE<TAB>ticketIdentity<TAB>price
+SNACK_PRICE<TAB>snackIdentity<TAB>price
+PROMOTION<TAB>code<TAB>percentage
+```
+
+Every ticket identity (`ADULT`, `SENIOR`, `STUDENT`) and snack/combo identity
+(`POPCORN`, `NACHOS`, `SOFT_DRINK`, `POPCORN_COMBO`, `NACHOS_COMBO`) must occur
+exactly once. Prices are canonical two-decimal amounts from `0.01` through
+`9999.99`, promotion codes are unique uppercase 1-to-32-character identifiers,
+and percentages are whole numbers from `1` through `100`. Blank and unknown
+records, malformed fields, duplicates, missing fixed identities, and unsupported
+versions reject the complete file.
+
+A missing `pricing.tsv` is atomically seeded with the former customer-facing
+values: Adult `11.00`, Senior `4.50`, Student `7.00`, Popcorn `5.00`, Nachos
+`6.00`, Soft Drink `3.00`, Popcorn Combo `7.00`, Nachos Combo `8.00`, `CS2103`
+at `20`, and `CS3227` at `99`. Valid existing files are not rewritten during
+load; malformed existing files are preserved and fail customer startup before
+catalog or seat access. `PricingStorage.save` serializes fixed values in enum
+display order and promotions in code order, validates the complete proposed state
+by parsing the canonical bytes, forces a same-directory temporary file, and
+requires atomic replacement. It reports a checked `PricingStorageException` and
+does not fall back to a non-atomic move.
+
 Temporary confirmed seat occupancy is stored in `data/runtime/seats.tsv`:
 
 ```text
@@ -202,8 +247,10 @@ This occupancy file is transitional. Once booking persistence is implemented,
 bookings will own seat allocations and availability will be derived from those
 allocations rather than duplicated here.
 
-Ticket assignments, snack and combo selections, promo codes, and calculated bills
-remain in memory only. No schema was added for them; a future booking-persistence
-requirement must define how these values are represented before they are stored.
+Ticket assignments, snack and combo selections, applied promo codes, and
+calculated bills remain in memory only as immutable snapshots. `pricing.tsv` is
+the global configuration source, not a booking record; a future
+booking-persistence requirement must define how these snapshots are represented
+before they are stored.
 
 The detailed data policy is recorded in `data/README.md`.

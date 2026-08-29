@@ -1,8 +1,8 @@
 # Application Data
 
-The customer movie catalog and temporary seat occupancy are stored as structured
-UTF-8 plain text under `data/runtime/`. Runtime files are mutable and ignored by
-Git. The fictional default catalog is bundled at
+The customer movie catalog, global pricing, and temporary seat occupancy are
+stored as structured UTF-8 plain text under `data/runtime/`. Runtime files are
+mutable and ignored by Git. The fictional default catalog is bundled at
 `src/main/resources/cinecli/default-catalog.tsv`.
 
 ## Catalog format version 1
@@ -30,6 +30,46 @@ When the runtime file is missing, CineCLI creates its parent directory if needed
 and copies the bundled defaults. An existing valid empty file remains empty. An
 existing malformed file is never overwritten or replaced with defaults; loading
 fails with a clear error instead.
+
+## Pricing format version 1
+
+`data/runtime/pricing.tsv` stores the complete global prices for the fixed ticket
+and snack/combo identities and the available percentage promotions. Each line is
+tab-separated:
+
+```text
+CINECLI-PRICING<TAB>1
+TICKET_PRICE<TAB>ticketIdentity<TAB>price
+SNACK_PRICE<TAB>snackIdentity<TAB>price
+PROMOTION<TAB>code<TAB>percentage
+```
+
+The header is compulsory. A valid file has exactly one `TICKET_PRICE` record for
+each of `ADULT`, `SENIOR`, and `STUDENT`, and exactly one `SNACK_PRICE` record for
+each of `POPCORN`, `NACHOS`, `SOFT_DRINK`, `POPCORN_COMBO`, and `NACHOS_COMBO`.
+It may contain zero or more `PROMOTION` records.
+
+- Prices use canonical decimal money syntax with exactly two decimal places and
+  must be from `0.01` through `9999.99` inclusive.
+- Promotion codes use 1 through 32 uppercase ASCII letters, digits, underscores,
+  or hyphens; the first character must be a letter or digit. Codes are unique.
+- Promotion percentages are whole numbers from `1` through `100` inclusive.
+- Blank lines, unknown records, invalid field counts, duplicate identities or
+  promotion codes, and unsupported versions are invalid.
+- Saves emit ticket and snack records in their menu/domain order and promotions
+  in code order, so the resulting bytes are deterministic.
+
+When `pricing.tsv` is missing, CineCLI atomically seeds the complete default
+state: Adult `11.00`, Senior `4.50`, Student `7.00`, Popcorn `5.00`, Nachos
+`6.00`, Soft Drink `3.00`, Popcorn Combo `7.00`, Nachos Combo `8.00`, `CS2103`
+at `20`, and `CS3227` at `99`. An existing valid file is read without rewriting
+its bytes. An existing malformed file is preserved and rejected rather than
+reseeded.
+
+Every pricing save validates the complete intended state, creates and forces a
+same-directory temporary file, and requires atomic replacement of the target.
+If writing or atomic replacement fails, the original target data is preserved;
+the implementation does not fall back to a non-atomic move.
 
 ## Temporary seat occupancy format version 1
 
@@ -74,8 +114,8 @@ as a rendered grid. During interaction, `X` also represents seats tentatively
 selected in the current session; tentative choices are persisted only after the
 user confirms them.
 
-Ticket assignments, snack and combo selections, promo codes, and calculated bills
-are session-only. They do not create additional runtime files or fields in either
-version 1 format.
+Ticket assignments, snack and combo selections, applied promo codes, and
+calculated bills are session-only. Their captured prices and percentages do not
+create additional runtime files or fields beyond the global `pricing.tsv` state.
 
 Do not store credentials or other secrets here.

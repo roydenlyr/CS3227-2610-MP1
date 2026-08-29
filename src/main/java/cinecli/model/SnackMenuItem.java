@@ -7,24 +7,22 @@ import java.util.regex.Pattern;
  * Represents one fixed snack or combo available after seat confirmation.
  */
 public enum SnackMenuItem {
-    POPCORN(1, "Popcorn", false, 500),
-    NACHOS(2, "Nachos", false, 600),
-    SOFT_DRINK(3, "Soft Drink", false, 300),
-    POPCORN_COMBO(4, "Popcorn Combo (Popcorn + Soft Drink)", true, 700),
-    NACHOS_COMBO(5, "Nachos Combo (Nachos + Soft Drink)", true, 800);
+    POPCORN(1, "Popcorn", false),
+    NACHOS(2, "Nachos", false),
+    SOFT_DRINK(3, "Soft Drink", false),
+    POPCORN_COMBO(4, "Popcorn Combo (Popcorn + Soft Drink)", true),
+    NACHOS_COMBO(5, "Nachos Combo (Nachos + Soft Drink)", true);
 
     private static final Pattern MENU_NUMBER_PATTERN = Pattern.compile("[1-9][0-9]*");
 
     private final int menuNumber;
     private final String displayName;
     private final boolean isCombo;
-    private final int priceInCents;
 
-    SnackMenuItem(int menuNumber, String displayName, boolean isCombo, int priceInCents) {
+    SnackMenuItem(int menuNumber, String displayName, boolean isCombo) {
         this.menuNumber = menuNumber;
         this.displayName = displayName;
         this.isCombo = isCombo;
-        this.priceInCents = priceInCents;
     }
 
     /**
@@ -81,15 +79,6 @@ public enum SnackMenuItem {
      */
     public boolean isCombo() {
         return isCombo;
-    }
-
-    /**
-     * Returns the exact price in Singapore cents.
-     *
-     * @return Price in cents.
-     */
-    public int getPriceInCents() {
-        return priceInCents;
     }
 
     private static String getSelectionRequirement() {

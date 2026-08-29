@@ -4,23 +4,21 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Represents a customer demographic and its fixed ticket price.
+ * Represents a customer ticket identity.
  */
 public enum TicketType {
-    ADULT(1, "Adult", 1100),
-    SENIOR(2, "Senior", 450),
-    STUDENT(3, "Student", 700);
+    ADULT(1, "Adult"),
+    SENIOR(2, "Senior"),
+    STUDENT(3, "Student");
 
     private static final Pattern MENU_NUMBER_PATTERN = Pattern.compile("[1-9][0-9]*");
 
     private final int menuNumber;
     private final String displayName;
-    private final int priceInCents;
 
-    TicketType(int menuNumber, String displayName, int priceInCents) {
+    TicketType(int menuNumber, String displayName) {
         this.menuNumber = menuNumber;
         this.displayName = displayName;
-        this.priceInCents = priceInCents;
     }
 
     /**
@@ -68,15 +66,6 @@ public enum TicketType {
      */
     public String getDisplayName() {
         return displayName;
-    }
-
-    /**
-     * Returns the exact price in Singapore cents.
-     *
-     * @return Price in cents.
-     */
-    public int getPriceInCents() {
-        return priceInCents;
     }
 
     private static String getSelectionRequirement() {

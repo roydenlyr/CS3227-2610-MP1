@@ -2,59 +2,44 @@ package cinecli.model;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
- * Represents a fixed promotion that discounts the complete bill.
+ * Captures an applied promotion that discounts the complete bill.
+ *
+ * @param code Canonical promotion code.
+ * @param discountPercentage Percentage discounted from the complete bill.
  */
-public enum PromoCode {
-    CS2103("CS2103", 20),
-    CS3227("CS3227", 99);
-
-    private final String code;
-    private final int discountPercentage;
-
-    PromoCode(String code, int discountPercentage) {
-        this.code = code;
-        this.discountPercentage = discountPercentage;
-    }
+public record PromoCode(String code, int discountPercentage) {
+    private static final Pattern CODE_PATTERN = Pattern.compile("[A-Z0-9][A-Z0-9_-]{0,31}");
+    private static final int MINIMUM_DISCOUNT_PERCENTAGE = 1;
+    private static final int MAXIMUM_DISCOUNT_PERCENTAGE = 100;
 
     /**
-     * Parses a case-insensitive promotion code.
+     * Creates an applied promotion snapshot.
      *
-     * @param value Promotion code to parse.
-     * @return Matching promotion.
-     * @throws IllegalArgumentException If the code is not supported.
+     * @throws NullPointerException If {@code code} is null.
+     * @throws IllegalArgumentException If the code or percentage is invalid.
      */
-    public static PromoCode parse(String value) {
-        Objects.requireNonNull(value, "value");
-        String normalizedValue = value.strip().toUpperCase(Locale.ROOT);
-        for (PromoCode promoCode : values()) {
-            if (promoCode.code.equals(normalizedValue)) {
-                return promoCode;
-            }
+    public PromoCode {
+        Objects.requireNonNull(code, "code");
+        code = code.strip().toUpperCase(Locale.ROOT);
+        if (!CODE_PATTERN.matcher(code).matches()) {
+            throw new IllegalArgumentException(getCodeRequirement());
         }
-        throw new IllegalArgumentException(getCodeRequirement());
-    }
-
-    /**
-     * Returns the customer-facing promotion code.
-     *
-     * @return Promotion code.
-     */
-    public String getCode() {
-        return code;
-    }
-
-    /**
-     * Returns the percentage discounted from the complete bill.
-     *
-     * @return Discount percentage.
-     */
-    public int getDiscountPercentage() {
-        return discountPercentage;
+        if (discountPercentage < MINIMUM_DISCOUNT_PERCENTAGE
+                || discountPercentage > MAXIMUM_DISCOUNT_PERCENTAGE) {
+            throw new IllegalArgumentException(getPercentageRequirement());
+        }
     }
 
     private static String getCodeRequirement() {
-        return "promo code must be CS2103 or CS3227";
+        return "promo code must be 1 through 32 ASCII letters, digits, underscores, or hyphens"
+                + " and start with a letter or digit";
+    }
+
+    private static String getPercentageRequirement() {
+        return "discount percentage must be from " + MINIMUM_DISCOUNT_PERCENTAGE + " through "
+                + MAXIMUM_DISCOUNT_PERCENTAGE;
     }
 }

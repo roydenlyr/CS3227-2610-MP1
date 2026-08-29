@@ -48,7 +48,7 @@ public record Bill(
     public long getTicketSubtotalInCents() {
         long subtotal = 0;
         for (TicketSelection selection : ticketSelections) {
-            subtotal = Math.addExact(subtotal, selection.ticketType().getPriceInCents());
+            subtotal = Math.addExact(subtotal, selection.unitPriceInCents());
         }
         return subtotal;
     }
@@ -62,7 +62,7 @@ public record Bill(
         long subtotal = 0;
         for (SnackSelection selection : snackSelections) {
             long selectionSubtotal = Math.multiplyExact(
-                    (long) selection.menuItem().getPriceInCents(), selection.quantity());
+                    (long) selection.unitPriceInCents(), selection.quantity());
             subtotal = Math.addExact(subtotal, selectionSubtotal);
         }
         return subtotal;
@@ -99,7 +99,7 @@ public record Bill(
         }
 
         int payablePercentage = PERCENTAGE_DIVISOR
-                - promoCode.orElseThrow().getDiscountPercentage();
+                - promoCode.orElseThrow().discountPercentage();
         long scaledPayableTotal = Math.multiplyExact(subtotal, payablePercentage);
         return Math.floorDiv(
                 Math.addExact(scaledPayableTotal, HALF_PERCENTAGE_DIVISOR),
