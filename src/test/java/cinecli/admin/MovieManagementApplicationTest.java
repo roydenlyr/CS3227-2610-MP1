@@ -47,10 +47,10 @@ class MovieManagementApplicationTest {
                 SCREENING\tSCR-1\tMOV-2\t2027-01-02\t21:30
                 """, null, lines("0"));
 
-        MovieManagementOutcome outcome = fixture.application().run();
+        AdminWorkflowOutcome outcome = fixture.application().run();
 
         assertAll(
-                () -> assertEquals(MovieManagementOutcome.BACK, outcome),
+                () -> assertEquals(AdminWorkflowOutcome.BACK, outcome),
                 () -> assertEquals("""
                         Movie Management
 
@@ -78,7 +78,7 @@ class MovieManagementApplicationTest {
         Fixture fixture = fixture(
                 "CINECLI-CATALOG\t1\n", null, lines("2", "3", "0"));
 
-        assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
 
         assertAll(
                 () -> assertTrue(fixture.terminal().output().contains(
@@ -99,7 +99,7 @@ class MovieManagementApplicationTest {
                 "1", "\tbad", "\u2003  新  星  \u00A0", "PG13", "2", "maybe", " y ", "0"),
                 FIRST_UUID, SECOND_UUID);
 
-        assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
 
         assertAll(
                 () -> assertTrue(fixture.terminal().output().contains(
@@ -121,7 +121,7 @@ class MovieManagementApplicationTest {
         Fixture fixture = fixture(simpleCatalog(), null, lines("1", "Draft", "/CANCEL", "0"));
         byte[] original = Files.readAllBytes(fixture.paths().catalog());
 
-        assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
 
         assertAll(
                 () -> assertTrue(fixture.terminal().output().contains("Movie addition cancelled.")),
@@ -133,7 +133,7 @@ class MovieManagementApplicationTest {
         Fixture fixture = fixture(simpleCatalog(), null, lines(
                 "2", "1", "1", "Updated", "2", "3", "3", "Y", "0"));
 
-        assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
 
         assertAll(
                 () -> assertTrue(fixture.terminal().output().contains("First -> Updated")),
@@ -153,7 +153,7 @@ class MovieManagementApplicationTest {
                 "2", "1", "1", "First", "2", "1", "3", "0", "0"));
         byte[] original = Files.readAllBytes(fixture.paths().catalog());
 
-        assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
 
         assertAll(
                 () -> assertTrue(fixture.terminal().output().contains("The movie title is unchanged.")),
@@ -171,7 +171,7 @@ class MovieManagementApplicationTest {
                 TAKEN_SEAT\tSCR-1\tB2
                 """, lines("3", "1", "Y", "0"));
 
-        assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
 
         assertAll(
                 () -> assertTrue(fixture.terminal().output().contains(
@@ -196,12 +196,12 @@ class MovieManagementApplicationTest {
         failedOutput.terminal().failWriteNumber(1);
 
         assertAll(
-                () -> assertEquals(MovieManagementOutcome.CUSTOMER, global.application().run()),
-                () -> assertEquals(MovieManagementOutcome.TERMINATED, eof.application().run()),
-                () -> assertEquals(MovieManagementOutcome.TERMINATED, failedInput.application().run()),
+                () -> assertEquals(AdminWorkflowOutcome.CUSTOMER, global.application().run()),
+                () -> assertEquals(AdminWorkflowOutcome.TERMINATED, eof.application().run()),
+                () -> assertEquals(AdminWorkflowOutcome.TERMINATED, failedInput.application().run()),
                 () -> assertEquals("Unable to read input. CineCLI will exit.\n",
                         failedInput.terminal().errors()),
-                () -> assertEquals(MovieManagementOutcome.TERMINATED, failedOutput.application().run()),
+                () -> assertEquals(AdminWorkflowOutcome.TERMINATED, failedOutput.application().run()),
                 () -> assertEquals("Unable to write output. CineCLI will exit.\n",
                         failedOutput.terminal().errors()));
     }
@@ -213,7 +213,7 @@ class MovieManagementApplicationTest {
                 "1", "\u2003\u00A0", "0", "0", "4", "PG13", "2147483648", "1",
                 "", "yes", "N", "0"));
 
-        assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
 
         assertAll(
                 () -> assertEquals(10, occurrences(
@@ -241,7 +241,7 @@ class MovieManagementApplicationTest {
                 lines("3", "1", "bad", "/cancel", "0"))) {
             Fixture fixture = fixture(simpleCatalog(), null, inputs);
             byte[] original = Files.readAllBytes(fixture.paths().catalog());
-            assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+            assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
             assertArrayEquals(original, Files.readAllBytes(fixture.paths().catalog()));
         }
     }
@@ -249,7 +249,7 @@ class MovieManagementApplicationTest {
     @Test
     void run_globalCommandsAtNestedPrompts_returnTypedOutcomesWithoutWrites() throws Exception {
         for (GlobalCommand.Type type : GlobalCommand.Type.values()) {
-            MovieManagementOutcome expected = MovieManagementOutcome.valueOf(type.name());
+            AdminWorkflowOutcome expected = AdminWorkflowOutcome.valueOf(type.name());
             for (List<TerminalInput> prefix : List.of(
                     List.<TerminalInput>of(),
                     lines("1"),
@@ -287,7 +287,7 @@ class MovieManagementApplicationTest {
             for (int failedWrite = 1; failedWrite <= writeCount; failedWrite++) {
                 Fixture fixture = fixture(simpleCatalog(), "CINECLI-SEATS\t1\n", lines(flow));
                 fixture.terminal().failWriteNumber(failedWrite);
-                assertEquals(MovieManagementOutcome.TERMINATED, fixture.application().run());
+                assertEquals(AdminWorkflowOutcome.TERMINATED, fixture.application().run());
                 assertEquals("Unable to write output. CineCLI will exit.\n",
                         fixture.terminal().errors());
             }
@@ -303,7 +303,7 @@ class MovieManagementApplicationTest {
         Fixture fixture = fixture(catalog, "malformed\n", lines("3", "1", "Y", "0"));
         byte[] originalSeats = Files.readAllBytes(fixture.paths().seats());
 
-        assertEquals(MovieManagementOutcome.BACK, fixture.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, fixture.application().run());
 
         assertAll(
                 () -> assertTrue(fixture.terminal().output().contains(
@@ -316,18 +316,18 @@ class MovieManagementApplicationTest {
     @Test
     void run_accessAndPreparationFailures_reportExactPrefixesAndReturnBack() throws Exception {
         Fixture malformedCatalog = fixture("malformed\n", null, lines("0"));
-        assertEquals(MovieManagementOutcome.BACK, malformedCatalog.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, malformedCatalog.application().run());
         assertTrue(malformedCatalog.terminal().output().startsWith(
                 "Unable to access movie management: "));
 
         Fixture malformedJournal = fixture(simpleCatalog(), null, lines("0"));
         Files.writeString(malformedJournal.paths().journal(), "malformed\n", UTF_8);
-        assertEquals(MovieManagementOutcome.BACK, malformedJournal.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, malformedJournal.application().run());
         assertTrue(malformedJournal.terminal().output().startsWith(
                 "Unable to access movie management: "));
 
         Fixture malformedSeats = fixture(simpleCatalog(), "malformed\n", lines("3", "1"));
-        assertEquals(MovieManagementOutcome.BACK, malformedSeats.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, malformedSeats.application().run());
         assertTrue(malformedSeats.terminal().output().contains(
                 "Unable to prepare movie deletion: "));
     }
@@ -340,7 +340,7 @@ class MovieManagementApplicationTest {
                 transactionFor(fixture.paths()),
                 fixture.terminal());
 
-        assertEquals(MovieManagementOutcome.BACK, application.run());
+        assertEquals(AdminWorkflowOutcome.BACK, application.run());
         assertTrue(fixture.terminal().output().contains("Movie addition cancelled."));
 
         Fixture sharedFixture = fixture(
@@ -351,7 +351,7 @@ class MovieManagementApplicationTest {
                 transactionFor(sharedFixture.paths()),
                 sharedTerminal);
 
-        assertEquals(MovieManagementOutcome.BACK, sharedApplication.run());
+        assertEquals(AdminWorkflowOutcome.BACK, sharedApplication.run());
         assertTrue(sharedFixture.terminal().output().contains("Movie addition cancelled."));
     }
 
@@ -359,15 +359,15 @@ class MovieManagementApplicationTest {
     void run_editFieldCancelRatingOnlyPreviewAndEmptyMessageFailure_coverAlternatives()
             throws Exception {
         Fixture titleCancel = fixture(simpleCatalog(), null, lines("2", "1", "1", "/cancel", "0"));
-        assertEquals(MovieManagementOutcome.BACK, titleCancel.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, titleCancel.application().run());
 
         Fixture ratingOnly = fixture(simpleCatalog(), null, lines("2", "1", "2", "2", "3", "N", "0"));
-        assertEquals(MovieManagementOutcome.BACK, ratingOnly.application().run());
+        assertEquals(AdminWorkflowOutcome.BACK, ratingOnly.application().run());
         assertTrue(ratingOnly.terminal().output().contains("Title: First (unchanged)"));
 
         Fixture emptyFailure = fixture("CINECLI-CATALOG\t1\n", null, lines("2"));
         emptyFailure.terminal().failWriteNumber(2);
-        assertEquals(MovieManagementOutcome.TERMINATED, emptyFailure.application().run());
+        assertEquals(AdminWorkflowOutcome.TERMINATED, emptyFailure.application().run());
     }
 
     private int occurrences(String text, String fragment) {
@@ -394,7 +394,7 @@ class MovieManagementApplicationTest {
                 paths.journal());
         ScriptedTerminal terminal = new ScriptedTerminal(inputs);
         Deque<UUID> generatedIds = new ArrayDeque<>(Arrays.asList(uuids));
-        MovieIdGenerator generator = generatedIds.isEmpty() ? () -> SECOND_UUID : generatedIds::removeFirst;
+        UuidGenerator generator = generatedIds.isEmpty() ? () -> SECOND_UUID : generatedIds::removeFirst;
         MovieManagementApplication application = new MovieManagementApplication(
                 catalogStorage, transaction, terminal, generator);
         return new Fixture(application, terminal, paths);

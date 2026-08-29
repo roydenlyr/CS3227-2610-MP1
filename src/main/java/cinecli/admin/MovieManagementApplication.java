@@ -34,7 +34,7 @@ public final class MovieManagementApplication {
     private final MovieDeletionTransaction deletionTransaction;
     private final CatalogRecoveryGate recoveryGate;
     private final AdminTerminal terminal;
-    private final MovieIdGenerator movieIdGenerator;
+    private final UuidGenerator movieIdGenerator;
     private final AdminInputRules inputRules = new AdminInputRules();
     private final MovieInputRules movieInputRules = new MovieInputRules();
     private final MovieManagementText text = new MovieManagementText();
@@ -59,7 +59,7 @@ public final class MovieManagementApplication {
             CatalogStorage catalogStorage,
             MovieDeletionTransaction deletionTransaction,
             AdminTerminal terminal,
-            MovieIdGenerator movieIdGenerator) {
+            UuidGenerator movieIdGenerator) {
         this.catalogStorage = catalogStorage;
         this.deletionTransaction = deletionTransaction;
         this.recoveryGate = new CatalogRecoveryGate(deletionTransaction);
@@ -68,8 +68,8 @@ public final class MovieManagementApplication {
     }
 
     /** Runs Movie management until a typed navigation or termination outcome occurs. */
-    public MovieManagementOutcome run() {
-        MovieManagementOutcome recoveryOutcome = recoverPendingDeletion();
+    public AdminWorkflowOutcome run() {
+        AdminWorkflowOutcome recoveryOutcome = recoverPendingDeletion();
         if (recoveryOutcome != null) {
             return recoveryOutcome;
         }
@@ -81,7 +81,7 @@ public final class MovieManagementApplication {
                 return reportStorageFailure(MovieManagementText.ACCESS_FAILURE_PREFIX, exception);
             }
             if (!write(text.management(movies))) {
-                return MovieManagementOutcome.TERMINATED;
+                return AdminWorkflowOutcome.TERMINATED;
             }
             Integer choice;
             while (true) {
@@ -94,12 +94,12 @@ public final class MovieManagementApplication {
                     break;
                 }
                 if (!write(MovieManagementText.ACTION_ERROR_WITH_PROMPT)) {
-                    return MovieManagementOutcome.TERMINATED;
+                    return AdminWorkflowOutcome.TERMINATED;
                 }
             }
-            MovieManagementOutcome outcome;
+            AdminWorkflowOutcome outcome;
             if (choice == 0) {
-                outcome = MovieManagementOutcome.BACK;
+                outcome = AdminWorkflowOutcome.BACK;
             } else if (choice == 1) {
                 outcome = addMovie(movies);
             } else if (choice == 2) {
@@ -117,11 +117,11 @@ public final class MovieManagementApplication {
         }
     }
 
-    private MovieManagementOutcome recoverPendingDeletion() {
+    private AdminWorkflowOutcome recoverPendingDeletion() {
         try {
             if (recoveryGate.recoverBeforeAccess()
                     && !write(MovieManagementText.RECOVERY_COMPLETED)) {
-                return MovieManagementOutcome.TERMINATED;
+                return AdminWorkflowOutcome.TERMINATED;
             }
             return null;
         } catch (TransactionStorageException exception) {
@@ -129,11 +129,11 @@ public final class MovieManagementApplication {
         }
     }
 
-    private MovieManagementOutcome showEmptyAction(String message) {
-        return write(message) ? null : MovieManagementOutcome.TERMINATED;
+    private AdminWorkflowOutcome showEmptyAction(String message) {
+        return write(message) ? null : AdminWorkflowOutcome.TERMINATED;
     }
 
-    private MovieManagementOutcome addMovie(List<Movie> movies) {
+    private AdminWorkflowOutcome addMovie(List<Movie> movies) {
         ValueResult<String> titleResult = requestTitle();
         if (titleResult.outcome != null) {
             return titleResult.outcome;
@@ -167,10 +167,10 @@ public final class MovieManagementApplication {
             return reportStorageFailure(MovieManagementText.CHANGE_NOT_SAVED_PREFIX, exception);
         }
         return write(text.added(titleResult.value, id))
-                ? null : MovieManagementOutcome.TERMINATED;
+                ? null : AdminWorkflowOutcome.TERMINATED;
     }
 
-    private MovieManagementOutcome editMovie(List<Movie> movies) {
+    private AdminWorkflowOutcome editMovie(List<Movie> movies) {
         TargetResult target = requestTarget(movies.size(), "edit");
         if (target.outcome != null) {
             return target.outcome;
@@ -186,7 +186,7 @@ public final class MovieManagementApplication {
             String menu = text.editMenu(
                     original, index + 1, proposedTitle, proposedRating);
             if (!write(menu)) {
-                return MovieManagementOutcome.TERMINATED;
+                return AdminWorkflowOutcome.TERMINATED;
             }
             ReadResult input = read();
             if (input.outcome != null) {
@@ -198,7 +198,7 @@ public final class MovieManagementApplication {
             Integer choice = inputRules.parseNumber(input.line, 0, 3);
             if (choice == null) {
                 if (!write(MovieManagementText.EDIT_MENU_ERROR)) {
-                    return MovieManagementOutcome.TERMINATED;
+                    return AdminWorkflowOutcome.TERMINATED;
                 }
                 continue;
             }
@@ -216,7 +216,7 @@ public final class MovieManagementApplication {
                 proposedTitle = title.value;
                 if (proposedTitle.equals(original.title())
                         && !write(MovieManagementText.TITLE_UNCHANGED)) {
-                    return MovieManagementOutcome.TERMINATED;
+                    return AdminWorkflowOutcome.TERMINATED;
                 }
                 continue;
             }
@@ -231,14 +231,14 @@ public final class MovieManagementApplication {
                 proposedRating = rating.value;
                 if (proposedRating == original.contentRating()
                         && !write(MovieManagementText.RATING_UNCHANGED)) {
-                    return MovieManagementOutcome.TERMINATED;
+                    return AdminWorkflowOutcome.TERMINATED;
                 }
                 continue;
             }
             if (proposedTitle.equals(original.title())
                     && proposedRating == original.contentRating()) {
                 if (!write(MovieManagementText.NO_CHANGES)) {
-                    return MovieManagementOutcome.TERMINATED;
+                    return AdminWorkflowOutcome.TERMINATED;
                 }
                 continue;
             }
@@ -263,11 +263,11 @@ public final class MovieManagementApplication {
                         MovieManagementText.CHANGE_NOT_SAVED_PREFIX, exception);
             }
             return write(text.updated(proposedTitle, original.id()))
-                    ? null : MovieManagementOutcome.TERMINATED;
+                    ? null : AdminWorkflowOutcome.TERMINATED;
         }
     }
 
-    private MovieManagementOutcome deleteMovie(List<Movie> movies) {
+    private AdminWorkflowOutcome deleteMovie(List<Movie> movies) {
         TargetResult target = requestTarget(movies.size(), "delete");
         if (target.outcome != null) {
             return target.outcome;
@@ -301,13 +301,13 @@ public final class MovieManagementApplication {
             return reportStorageFailure(prefix, exception);
         }
         return write(text.deleted(result))
-                ? null : MovieManagementOutcome.TERMINATED;
+                ? null : AdminWorkflowOutcome.TERMINATED;
     }
 
     private ValueResult<String> requestTitle() {
         while (true) {
             if (!write(MovieManagementText.TITLE_PROMPT)) {
-                return ValueResult.outcome(MovieManagementOutcome.TERMINATED);
+                return ValueResult.outcome(AdminWorkflowOutcome.TERMINATED);
             }
             ReadResult input = read();
             if (input.outcome != null) {
@@ -319,13 +319,13 @@ public final class MovieManagementApplication {
             MovieInputRules.TitleResult title = movieInputRules.interpretTitle(input.line);
             if (title.status() == MovieInputRules.TitleStatus.CONTROL_CHARACTERS) {
                 if (!write(MovieManagementText.TITLE_CONTROL_ERROR)) {
-                    return ValueResult.outcome(MovieManagementOutcome.TERMINATED);
+                    return ValueResult.outcome(AdminWorkflowOutcome.TERMINATED);
                 }
                 continue;
             }
             if (title.status() == MovieInputRules.TitleStatus.BLANK) {
                 if (!write(MovieManagementText.TITLE_BLANK_ERROR)) {
-                    return ValueResult.outcome(MovieManagementOutcome.TERMINATED);
+                    return ValueResult.outcome(AdminWorkflowOutcome.TERMINATED);
                 }
                 continue;
             }
@@ -337,7 +337,7 @@ public final class MovieManagementApplication {
         String prompt = MovieManagementText.RATING_PROMPT;
         while (true) {
             if (!write(prompt)) {
-                return ValueResult.outcome(MovieManagementOutcome.TERMINATED);
+                return ValueResult.outcome(AdminWorkflowOutcome.TERMINATED);
             }
             ReadResult input = read();
             if (input.outcome != null) {
@@ -349,7 +349,7 @@ public final class MovieManagementApplication {
             Integer rating = inputRules.parseNumber(input.line, 1, 3);
             if (rating == null) {
                 if (!write(MovieManagementText.RATING_ERROR)) {
-                    return ValueResult.outcome(MovieManagementOutcome.TERMINATED);
+                    return ValueResult.outcome(AdminWorkflowOutcome.TERMINATED);
                 }
                 continue;
             }
@@ -361,7 +361,7 @@ public final class MovieManagementApplication {
         String prompt = text.targetPrompt(action);
         while (true) {
             if (!write(prompt)) {
-                return TargetResult.outcome(MovieManagementOutcome.TERMINATED);
+                return TargetResult.outcome(AdminWorkflowOutcome.TERMINATED);
             }
             ReadResult input = read();
             if (input.outcome != null) {
@@ -373,7 +373,7 @@ public final class MovieManagementApplication {
             Integer target = inputRules.parseNumber(input.line, 0, count);
             if (target == null) {
                 if (!write(text.targetError(count))) {
-                    return TargetResult.outcome(MovieManagementOutcome.TERMINATED);
+                    return TargetResult.outcome(AdminWorkflowOutcome.TERMINATED);
                 }
                 continue;
             }
@@ -383,7 +383,7 @@ public final class MovieManagementApplication {
 
     private ConfirmationResult confirm(String preview, String prompt) {
         if (!write(preview)) {
-            return ConfirmationResult.outcome(MovieManagementOutcome.TERMINATED);
+            return ConfirmationResult.outcome(AdminWorkflowOutcome.TERMINATED);
         }
         while (true) {
             ReadResult input = read();
@@ -398,7 +398,7 @@ public final class MovieManagementApplication {
                 return ConfirmationResult.cancelled();
             }
             if (!write(MovieManagementText.CONFIRMATION_ERROR + prompt)) {
-                return ConfirmationResult.outcome(MovieManagementOutcome.TERMINATED);
+                return ConfirmationResult.outcome(AdminWorkflowOutcome.TERMINATED);
             }
         }
     }
@@ -409,17 +409,17 @@ public final class MovieManagementApplication {
             return new ReadResult(value, null);
         }
         if (input instanceof GlobalCommand(GlobalCommand.Type type)) {
-            MovieManagementOutcome outcome = switch (type) {
-                case ADMIN -> MovieManagementOutcome.ADMIN;
-                case CUSTOMER -> MovieManagementOutcome.CUSTOMER;
-                case EXIT -> MovieManagementOutcome.EXIT;
+            AdminWorkflowOutcome outcome = switch (type) {
+                case ADMIN -> AdminWorkflowOutcome.ADMIN;
+                case CUSTOMER -> AdminWorkflowOutcome.CUSTOMER;
+                case EXIT -> AdminWorkflowOutcome.EXIT;
             };
             return new ReadResult(null, outcome);
         }
         if (input instanceof InputFailure) {
             terminal.writeError(INPUT_FAILURE);
         }
-        return new ReadResult(null, MovieManagementOutcome.TERMINATED);
+        return new ReadResult(null, AdminWorkflowOutcome.TERMINATED);
     }
 
     private boolean write(String text) {
@@ -430,13 +430,13 @@ public final class MovieManagementApplication {
         return false;
     }
 
-    private MovieManagementOutcome cancel(String message) {
-        return write(message) ? null : MovieManagementOutcome.TERMINATED;
+    private AdminWorkflowOutcome cancel(String message) {
+        return write(message) ? null : AdminWorkflowOutcome.TERMINATED;
     }
 
-    private MovieManagementOutcome reportStorageFailure(String prefix, Exception exception) {
+    private AdminWorkflowOutcome reportStorageFailure(String prefix, Exception exception) {
         return write(text.storageFailure(prefix, exception))
-                ? MovieManagementOutcome.BACK : MovieManagementOutcome.TERMINATED;
+                ? AdminWorkflowOutcome.BACK : AdminWorkflowOutcome.TERMINATED;
     }
 
     private String generateUniqueId(List<Movie> movies) {
@@ -449,15 +449,15 @@ public final class MovieManagementApplication {
         return candidate;
     }
 
-    private record ReadResult(String line, MovieManagementOutcome outcome) {
+    private record ReadResult(String line, AdminWorkflowOutcome outcome) {
     }
 
     private static final class ValueResult<T> {
         private final T value;
         private final boolean isCancelled;
-        private final MovieManagementOutcome outcome;
+        private final AdminWorkflowOutcome outcome;
 
-        private ValueResult(T value, boolean isCancelled, MovieManagementOutcome outcome) {
+        private ValueResult(T value, boolean isCancelled, AdminWorkflowOutcome outcome) {
             this.value = value;
             this.isCancelled = isCancelled;
             this.outcome = outcome;
@@ -471,13 +471,13 @@ public final class MovieManagementApplication {
             return new ValueResult<>(null, true, null);
         }
 
-        private static <T> ValueResult<T> outcome(MovieManagementOutcome outcome) {
+        private static <T> ValueResult<T> outcome(AdminWorkflowOutcome outcome) {
             return new ValueResult<>(null, false, outcome);
         }
     }
 
     private record TargetResult(
-            int index, boolean isBack, boolean isCancelled, MovieManagementOutcome outcome) {
+            int index, boolean isBack, boolean isCancelled, AdminWorkflowOutcome outcome) {
         private static TargetResult index(int index) {
             return new TargetResult(index, false, false, null);
         }
@@ -490,12 +490,12 @@ public final class MovieManagementApplication {
             return new TargetResult(-1, true, true, null);
         }
 
-        private static TargetResult outcome(MovieManagementOutcome outcome) {
+        private static TargetResult outcome(AdminWorkflowOutcome outcome) {
             return new TargetResult(-1, false, false, outcome);
         }
     }
 
-    private record ConfirmationResult(boolean isConfirmed, MovieManagementOutcome outcome) {
+    private record ConfirmationResult(boolean isConfirmed, AdminWorkflowOutcome outcome) {
         private static ConfirmationResult confirmed() {
             return new ConfirmationResult(true, null);
         }
@@ -504,7 +504,7 @@ public final class MovieManagementApplication {
             return new ConfirmationResult(false, null);
         }
 
-        private static ConfirmationResult outcome(MovieManagementOutcome outcome) {
+        private static ConfirmationResult outcome(AdminWorkflowOutcome outcome) {
             return new ConfirmationResult(false, outcome);
         }
     }

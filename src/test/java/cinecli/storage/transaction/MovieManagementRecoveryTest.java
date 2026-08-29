@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cinecli.admin.MovieManagementApplication;
-import cinecli.admin.MovieManagementOutcome;
+import cinecli.admin.AdminWorkflowOutcome;
 import cinecli.admin.ui.EndOfInput;
 import cinecli.admin.ui.MovieManagementTerminal;
 import cinecli.admin.ui.SubmittedLine;
@@ -39,7 +39,7 @@ class MovieManagementRecoveryTest {
         MovieManagementApplication successful = application(
                 successfulPaths, transaction(successfulPaths), successfulTerminal);
 
-        assertEquals(MovieManagementOutcome.BACK, successful.run());
+        assertEquals(AdminWorkflowOutcome.BACK, successful.run());
         assertTrue(successfulTerminal.output().startsWith(
                 "Pending movie deletion recovery completed.\nMovie Management"));
         assertFalse(Files.exists(successfulPaths.journal()));
@@ -51,7 +51,7 @@ class MovieManagementRecoveryTest {
         MovieManagementApplication failed = application(
                 failedOutputPaths, transaction(failedOutputPaths), failedTerminal);
 
-        assertEquals(MovieManagementOutcome.TERMINATED, failed.run());
+        assertEquals(AdminWorkflowOutcome.TERMINATED, failed.run());
         assertEquals("Unable to write output. CineCLI will exit.\n", failedTerminal.errors());
     }
 
@@ -70,7 +70,7 @@ class MovieManagementRecoveryTest {
         };
         MovieManagementApplication notApplied = application(
                 notAppliedPaths, transaction(notAppliedPaths), notAppliedTerminal);
-        assertEquals(MovieManagementOutcome.BACK, notApplied.run());
+        assertEquals(AdminWorkflowOutcome.BACK, notApplied.run());
         assertTrue(notAppliedTerminal.output().contains("Movie deletion was not applied: "));
         assertFalse(Files.exists(notAppliedPaths.journal()));
 
@@ -85,7 +85,7 @@ class MovieManagementRecoveryTest {
         Terminal pendingTerminal = new Terminal("3", "1", "Y");
         MovieManagementApplication pending = application(
                 pendingPaths, pendingTransaction, pendingTerminal);
-        assertEquals(MovieManagementOutcome.BACK, pending.run());
+        assertEquals(AdminWorkflowOutcome.BACK, pending.run());
         assertTrue(pendingTerminal.output().contains(
                 "Movie deletion is confirmed but recovery is pending: "));
         assertTrue(Files.exists(pendingPaths.journal()));

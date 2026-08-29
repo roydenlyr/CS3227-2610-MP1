@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cinecli.admin.MovieManagementApplication;
-import cinecli.admin.MovieManagementOutcome;
+import cinecli.admin.AdminWorkflowOutcome;
 import cinecli.admin.ui.EndOfInput;
 import cinecli.admin.ui.MovieManagementTerminal;
 import cinecli.admin.ui.SubmittedLine;
@@ -49,9 +49,9 @@ class MovieManagementStorageFailureTest {
             CatalogStorage storage = failingSaveStorage(catalogPath);
             Terminal terminal = new Terminal(inputs);
 
-            MovieManagementOutcome outcome = application(storage, catalogPath, terminal).run();
+            AdminWorkflowOutcome outcome = application(storage, catalogPath, terminal).run();
 
-            assertEquals(MovieManagementOutcome.BACK, outcome);
+            assertEquals(AdminWorkflowOutcome.BACK, outcome);
             assertTrue(terminal.output.toString().contains("Movie change was not saved: "));
             assertArrayEquals(original, Files.readAllBytes(catalogPath));
         }
@@ -67,7 +67,7 @@ class MovieManagementStorageFailureTest {
         terminal.failedWriteNumber = 5;
 
         assertEquals(
-                MovieManagementOutcome.TERMINATED,
+                AdminWorkflowOutcome.TERMINATED,
                 application(storage, catalogPath, terminal).run());
     }
 
