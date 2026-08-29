@@ -9,6 +9,8 @@ import cinecli.storage.catalog.CatalogTransactionAdapter;
 import cinecli.storage.exception.MovieDeletionCommitException;
 import cinecli.storage.exception.MovieDeletionCommitException.Status;
 import cinecli.storage.exception.MovieDeletionPreparationException;
+import cinecli.storage.exception.ScreeningDeletionCommitException;
+import cinecli.storage.exception.ScreeningDeletionPreparationException;
 import cinecli.storage.exception.StorageException;
 import cinecli.storage.exception.TransactionStorageException;
 import cinecli.storage.seat.SeatTransactionAdapter;
@@ -34,7 +36,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
-/** Coordinates atomic Movie deletion across catalogue and occupancy files. */
+/** Coordinates atomic catalogue deletions across catalogue and occupancy files. */
 public final class MovieDeletionTransaction {
     private static final Pattern ID_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
     private static final Pattern DIGEST_PATTERN = Pattern.compile("[0-9a-f]{64}");
@@ -43,6 +45,11 @@ public final class MovieDeletionTransaction {
     private final SeatTransactionAdapter seatAdapter;
     private final Path journalPath;
     private final TransactionOperationHook operationHook;
+
+    private enum DeletionOperation {
+        DELETE_MOVIE,
+        DELETE_SCREENING
+    }
 
     /** Creates a transaction facade over storage-internal adapters. */
     public MovieDeletionTransaction(
@@ -123,8 +130,8 @@ public final class MovieDeletionTransaction {
                         intendedCatalog,
                         catalog.bytes(),
                         intendedCatalogBytes,
-                        TransactionFileSnapshot.missing(Map.of()),
-                        TransactionFileSnapshot.missing(Map.of()));
+                        TransactionFileSnapshot.<Map<String, Set<SeatCoordinate>>>missing(Map.of()),
+                        TransactionFileSnapshot.<Map<String, Set<SeatCoordinate>>>missing(Map.of()));
             }
 
             Set<String> originalScreeningIds = screeningIds(catalog.value());
@@ -163,22 +170,89 @@ public final class MovieDeletionTransaction {
         }
     }
 
+    /** Prepares a Screening deletion and its complete impact preview without writing. */
+    public PreparedScreeningDeletion prepareScreening(String screeningId)
+            throws ScreeningDeletionPreparationException {
+        if (Files.exists(journalPath)) {
+            throw new ScreeningDeletionPreparationException(
+                    "A catalogue transaction journal already exists and must be recovered.");
+        }
+        try {
+            TransactionFileSnapshot<List<Movie>> catalog = catalogAdapter.loadSnapshot();
+            ScreeningLocation location = findScreening(catalog.value(), screeningId);
+            Set<String> originalScreeningIds = screeningIds(catalog.value());
+            TransactionFileSnapshot<Map<String, Set<SeatCoordinate>>> originalSeats =
+                    seatAdapter.loadSnapshot(originalScreeningIds);
+            Map<String, Set<SeatCoordinate>> reducedSeats = mutableSeatCopy(originalSeats.value());
+            int occupiedSeatCount = reducedSeats.getOrDefault(screeningId, Set.of()).size();
+            boolean hasAffectedSeats = reducedSeats.containsKey(screeningId);
+            reducedSeats.remove(screeningId);
+            TransactionFileSnapshot<Map<String, Set<SeatCoordinate>>> intendedSeats;
+            if (!originalSeats.isPresent()) {
+                intendedSeats = TransactionFileSnapshot.missing(Map.of());
+            } else if (!hasAffectedSeats) {
+                intendedSeats = TransactionFileSnapshot.present(reducedSeats, originalSeats.bytes());
+            } else {
+                intendedSeats = TransactionFileSnapshot.present(
+                        reducedSeats, seatAdapter.serialize(reducedSeats));
+            }
+            List<Movie> intendedCatalog = removeScreening(catalog.value(), location);
+            return new PreparedScreeningDeletion(
+                    location.movie(),
+                    location.screening(),
+                    location.displayPosition(),
+                    occupiedSeatCount,
+                    intendedCatalog,
+                    catalog.bytes(),
+                    catalogAdapter.serialize(intendedCatalog),
+                    originalSeats,
+                    intendedSeats);
+        } catch (StorageException exception) {
+            throw new ScreeningDeletionPreparationException(exception.getMessage(), exception);
+        }
+    }
+
     /** Commits one prepared deletion. */
     public MovieDeletionResult commit(PreparedMovieDeletion deletion)
             throws MovieDeletionCommitException {
         if (deletion == null) {
             throw new IllegalArgumentException("prepared deletion must not be null");
         }
-        synchronized (deletion) {
-            if (deletion.isConsumed) {
-                throw new IllegalStateException("prepared deletion has already been committed");
-            }
-            deletion.isConsumed = true;
-        }
+        consume(deletion);
         if (!deletion.isCascading()) {
             return commitChildless(deletion);
         }
-        return commitCascade(deletion);
+        try {
+            commitCascade(DeletionOperation.DELETE_MOVIE, deletion.movieId(), deletion);
+            return resultOf(deletion);
+        } catch (CommitFailure exception) {
+            throw commitFailure(exception.status(), (Exception) exception.getCause());
+        }
+    }
+
+    /** Commits one prepared Screening deletion through the durable journal. */
+    public ScreeningDeletionResult commitScreening(PreparedScreeningDeletion deletion)
+            throws ScreeningDeletionCommitException {
+        if (deletion == null) {
+            throw new IllegalArgumentException("prepared deletion must not be null");
+        }
+        consume(deletion);
+        try {
+            commitCascade(DeletionOperation.DELETE_SCREENING, deletion.screeningId(), deletion);
+            return new ScreeningDeletionResult(
+                    deletion.screeningId(),
+                    deletion.parentMovieId(),
+                    deletion.parentMovieTitle(),
+                    deletion.startsAt(),
+                    deletion.occupiedSeatCount());
+        } catch (CommitFailure exception) {
+            ScreeningDeletionCommitException.Status status =
+                    exception.status() == Status.RECOVERY_PENDING
+                            ? ScreeningDeletionCommitException.Status.RECOVERY_PENDING
+                            : ScreeningDeletionCommitException.Status.NOT_APPLIED;
+            throw new ScreeningDeletionCommitException(status, exception.getCause().getMessage(),
+                    exception.getCause());
+        }
     }
 
     private MovieDeletionResult commitChildless(PreparedMovieDeletion deletion)
@@ -192,8 +266,9 @@ public final class MovieDeletionTransaction {
         }
     }
 
-    private MovieDeletionResult commitCascade(PreparedMovieDeletion deletion)
-            throws MovieDeletionCommitException {
+    private void commitCascade(
+            DeletionOperation operation, String subjectId, PreparedCatalogDeletion deletion)
+            throws CommitFailure {
         Path temporaryJournal = null;
         boolean isJournalPublished = false;
         try {
@@ -202,7 +277,7 @@ public final class MovieDeletionTransaction {
             }
             requireCatalogOriginal(deletion.originalCatalogBytes);
             requireSeatsOriginal(deletion.originalSeats);
-            byte[] journalBytes = serializeJournal(deletion);
+            byte[] journalBytes = serializeJournal(operation, subjectId, deletion);
             Files.createDirectories(journalPath.getParent());
             operationHook.before(TransactionOperation.CREATE_JOURNAL_TEMPORARY, journalPath.getParent());
             temporaryJournal = Files.createTempFile(
@@ -225,7 +300,8 @@ public final class MovieDeletionTransaction {
                 seatAdapter.replace(deletion.intendedSeats, screeningIds(deletion.intendedCatalog));
             }
             verifyIntended(new Journal(
-                    deletion.movieId(),
+                    operation,
+                    subjectId,
                     deletion.originalCatalogBytes,
                     deletion.intendedCatalogBytes,
                     deletion.intendedCatalog,
@@ -233,10 +309,9 @@ public final class MovieDeletionTransaction {
                     deletion.intendedSeats));
             operationHook.before(TransactionOperation.DELETE_JOURNAL, journalPath);
             Files.delete(journalPath);
-            return resultOf(deletion);
         } catch (Exception exception) {
             Status status = isJournalPublished ? Status.RECOVERY_PENDING : Status.NOT_APPLIED;
-            throw commitFailure(status, exception);
+            throw new CommitFailure(status, exception);
         } finally {
             if (!isJournalPublished && temporaryJournal != null) {
                 try {
@@ -265,11 +340,10 @@ public final class MovieDeletionTransaction {
             throw malformedJournal();
         }
         String[] lines = text.split("\n", -1);
-        if (lines.length != 8
-                || !"CINECLI-CATALOG-TRANSACTION\t1".equals(lines[0])
-                || !"OPERATION\tDELETE_MOVIE".equals(lines[1])) {
+        if (lines.length != 8 || !"CINECLI-CATALOG-TRANSACTION\t1".equals(lines[0])) {
             throw malformedJournal();
         }
+        DeletionOperation operation = parseOperation(lines[1]);
         String subjectId = requireTwoFields(lines[2], "SUBJECT_ID");
         if (!ID_PATTERN.matcher(subjectId).matches()) {
             throw malformedJournal();
@@ -281,13 +355,7 @@ public final class MovieDeletionTransaction {
                     originalCatalogBytes, "journal original catalogue");
             List<Movie> intendedCatalog = catalogAdapter.parse(
                     intendedCatalogBytes, "journal intended catalogue");
-            Movie subject = originalCatalog.stream()
-                    .filter(movie -> movie.id().equals(subjectId))
-                    .findFirst()
-                    .orElseThrow(this::malformedJournal);
-            List<Movie> expectedCatalog = originalCatalog.stream()
-                    .filter(movie -> !movie.id().equals(subjectId))
-                    .toList();
+            List<Movie> expectedCatalog = expectedCatalog(operation, originalCatalog, subjectId);
             if (!expectedCatalog.equals(intendedCatalog)) {
                 throw malformedJournal();
             }
@@ -301,11 +369,10 @@ public final class MovieDeletionTransaction {
             if (originalSeats.isPresent() != intendedSeats.isPresent()) {
                 throw malformedJournal();
             }
+            Set<String> removedScreeningIds = removedScreeningIds(operation, originalCatalog, subjectId);
             Map<String, Set<SeatCoordinate>> expectedSeats = mutableSeatCopy(originalSeats.value());
-            boolean hasAffected = subject.screenings().stream()
-                    .map(Screening::id)
-                    .anyMatch(expectedSeats::containsKey);
-            subject.screenings().stream().map(Screening::id).forEach(expectedSeats::remove);
+            boolean hasAffected = removedScreeningIds.stream().anyMatch(expectedSeats::containsKey);
+            removedScreeningIds.forEach(expectedSeats::remove);
             if (!expectedSeats.equals(intendedSeats.value())) {
                 throw malformedJournal();
             }
@@ -316,6 +383,7 @@ public final class MovieDeletionTransaction {
                 throw malformedJournal();
             }
             return new Journal(
+                    operation,
                     subjectId,
                     originalCatalogBytes,
                     intendedCatalogBytes,
@@ -381,11 +449,13 @@ public final class MovieDeletionTransaction {
         return fields[1];
     }
 
-    private byte[] serializeJournal(PreparedMovieDeletion deletion) throws NoSuchAlgorithmException {
+    private byte[] serializeJournal(
+            DeletionOperation operation, String subjectId, PreparedCatalogDeletion deletion)
+            throws NoSuchAlgorithmException {
         StringBuilder journal = new StringBuilder();
         journal.append("CINECLI-CATALOG-TRANSACTION\t1\n")
-                .append("OPERATION\tDELETE_MOVIE\n")
-                .append("SUBJECT_ID\t").append(deletion.movieId()).append('\n')
+                .append("OPERATION\t").append(operation).append('\n')
+                .append("SUBJECT_ID\t").append(subjectId).append('\n')
                 .append(snapshotLine("CATALOG_ORIGINAL", deletion.originalCatalogBytes))
                 .append(snapshotLine("CATALOG_INTENDED", deletion.intendedCatalogBytes))
                 .append(seatLine("SEATS_ORIGINAL", deletion.originalSeats))
@@ -455,6 +525,99 @@ public final class MovieDeletionTransaction {
         throw new MovieDeletionPreparationException("Unknown movie ID '" + movieId + "'.");
     }
 
+    private ScreeningLocation findScreening(List<Movie> movies, String screeningId)
+            throws ScreeningDeletionPreparationException {
+        int displayPosition = 0;
+        for (Movie movie : movies) {
+            for (Screening screening : movie.screenings()) {
+                displayPosition++;
+                if (screening.id().equals(screeningId)) {
+                    return new ScreeningLocation(movie, screening, displayPosition);
+                }
+            }
+        }
+        throw new ScreeningDeletionPreparationException("Unknown screening ID '" + screeningId + "'.");
+    }
+
+    private List<Movie> removeScreening(List<Movie> movies, ScreeningLocation location) {
+        List<Movie> intended = new ArrayList<>();
+        for (Movie movie : movies) {
+            if (!movie.id().equals(location.movie().id())) {
+                intended.add(movie);
+                continue;
+            }
+            List<Screening> screenings = movie.screenings().stream()
+                    .filter(screening -> !screening.id().equals(location.screening().id()))
+                    .toList();
+            intended.add(new Movie(movie.id(), movie.title(), movie.contentRating(), screenings));
+        }
+        return intended;
+    }
+
+    private DeletionOperation parseOperation(String line) throws TransactionStorageException {
+        if ("OPERATION\tDELETE_MOVIE".equals(line)) {
+            return DeletionOperation.DELETE_MOVIE;
+        }
+        if ("OPERATION\tDELETE_SCREENING".equals(line)) {
+            return DeletionOperation.DELETE_SCREENING;
+        }
+        throw malformedJournal();
+    }
+
+    private List<Movie> expectedCatalog(
+            DeletionOperation operation, List<Movie> originalCatalog, String subjectId)
+            throws TransactionStorageException {
+        if (operation == DeletionOperation.DELETE_MOVIE) {
+            boolean isKnown = originalCatalog.stream().anyMatch(movie -> movie.id().equals(subjectId));
+            if (!isKnown) {
+                throw malformedJournal();
+            }
+            return originalCatalog.stream().filter(movie -> !movie.id().equals(subjectId)).toList();
+        }
+        try {
+            return removeScreening(originalCatalog, findScreeningForJournal(originalCatalog, subjectId));
+        } catch (TransactionStorageException exception) {
+            throw exception;
+        }
+    }
+
+    private ScreeningLocation findScreeningForJournal(List<Movie> movies, String screeningId)
+            throws TransactionStorageException {
+        int displayPosition = 0;
+        for (Movie movie : movies) {
+            for (Screening screening : movie.screenings()) {
+                displayPosition++;
+                if (screening.id().equals(screeningId)) {
+                    return new ScreeningLocation(movie, screening, displayPosition);
+                }
+            }
+        }
+        throw malformedJournal();
+    }
+
+    private Set<String> removedScreeningIds(
+            DeletionOperation operation, List<Movie> originalCatalog, String subjectId)
+            throws TransactionStorageException {
+        if (operation == DeletionOperation.DELETE_SCREENING) {
+            findScreeningForJournal(originalCatalog, subjectId);
+            return Set.of(subjectId);
+        }
+        return originalCatalog.stream()
+                .filter(movie -> movie.id().equals(subjectId))
+                .flatMap(movie -> movie.screenings().stream())
+                .map(Screening::id)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    private void consume(PreparedCatalogDeletion deletion) {
+        synchronized (deletion) {
+            if (deletion.isConsumed) {
+                throw new IllegalStateException("prepared deletion has already been committed");
+            }
+            deletion.isConsumed = true;
+        }
+    }
+
     private Set<String> screeningIds(List<Movie> movies) {
         Set<String> ids = new HashSet<>();
         for (Movie movie : movies) {
@@ -489,11 +652,28 @@ public final class MovieDeletionTransaction {
     }
 
     private record Journal(
+            DeletionOperation operation,
             String subjectId,
             byte[] originalCatalogBytes,
             byte[] intendedCatalogBytes,
             List<Movie> intendedCatalog,
             TransactionFileSnapshot<Map<String, Set<SeatCoordinate>>> originalSeats,
             TransactionFileSnapshot<Map<String, Set<SeatCoordinate>>> intendedSeats) {
+    }
+
+    private record ScreeningLocation(Movie movie, Screening screening, int displayPosition) {
+    }
+
+    private static final class CommitFailure extends Exception {
+        private final Status status;
+
+        private CommitFailure(Status status, Exception cause) {
+            super(cause);
+            this.status = status;
+        }
+
+        private Status status() {
+            return status;
+        }
     }
 }
