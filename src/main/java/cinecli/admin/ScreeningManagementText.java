@@ -150,7 +150,11 @@ final class ScreeningManagementText {
         return prefix + exception.getMessage() + "\n";
     }
 
-    record ScreeningLocation(Movie movie, Screening screening, int movieIndex, int screeningIndex,
-                             int displayPosition) {
+    record ScreeningLocation(
+            Movie movie,
+            Screening screening,
+            int movieIndex,
+            int screeningIndex,
+            int displayPosition) {
     }
 }

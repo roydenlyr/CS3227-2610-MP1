@@ -2,11 +2,7 @@ package cinecli.admin;
 
 import cinecli.admin.AdminInputRules.Confirmation;
 import cinecli.admin.ui.AdminTerminal;
-import cinecli.admin.ui.GlobalCommand;
-import cinecli.admin.ui.InputFailure;
 import cinecli.admin.ui.MovieManagementTerminal;
-import cinecli.admin.ui.SubmittedLine;
-import cinecli.admin.ui.TerminalInput;
 import cinecli.model.ContentRating;
 import cinecli.model.Movie;
 import cinecli.storage.catalog.CatalogStorage;
@@ -27,13 +23,10 @@ import java.util.UUID;
 
 /** Coordinates administrator Movie-management workflows. */
 public final class MovieManagementApplication {
-    private static final String OUTPUT_FAILURE = "Unable to write output. CineCLI will exit.\n";
-    private static final String INPUT_FAILURE = "Unable to read input. CineCLI will exit.\n";
-
     private final CatalogStorage catalogStorage;
     private final MovieDeletionTransaction deletionTransaction;
     private final CatalogRecoveryGate recoveryGate;
-    private final AdminTerminal terminal;
+    private final AdminWorkflowInteraction interaction;
     private final UuidGenerator movieIdGenerator;
     private final AdminInputRules inputRules = new AdminInputRules();
     private final MovieInputRules movieInputRules = new MovieInputRules();
@@ -63,7 +56,7 @@ public final class MovieManagementApplication {
         this.catalogStorage = catalogStorage;
         this.deletionTransaction = deletionTransaction;
         this.recoveryGate = new CatalogRecoveryGate(deletionTransaction);
-        this.terminal = terminal;
+        this.interaction = new AdminWorkflowInteraction(terminal);
         this.movieIdGenerator = movieIdGenerator;
     }
 
@@ -404,30 +397,12 @@ public final class MovieManagementApplication {
     }
 
     private ReadResult read() {
-        TerminalInput input = terminal.readLine();
-        if (input instanceof SubmittedLine(String value)) {
-            return new ReadResult(value, null);
-        }
-        if (input instanceof GlobalCommand(GlobalCommand.Type type)) {
-            AdminWorkflowOutcome outcome = switch (type) {
-                case ADMIN -> AdminWorkflowOutcome.ADMIN;
-                case CUSTOMER -> AdminWorkflowOutcome.CUSTOMER;
-                case EXIT -> AdminWorkflowOutcome.EXIT;
-            };
-            return new ReadResult(null, outcome);
-        }
-        if (input instanceof InputFailure) {
-            terminal.writeError(INPUT_FAILURE);
-        }
-        return new ReadResult(null, AdminWorkflowOutcome.TERMINATED);
+        AdminWorkflowInput input = interaction.read();
+        return new ReadResult(input.line(), input.outcome());
     }
 
     private boolean write(String text) {
-        if (terminal.write(text)) {
-            return true;
-        }
-        terminal.writeError(OUTPUT_FAILURE);
-        return false;
+        return interaction.write(text);
     }
 
     private AdminWorkflowOutcome cancel(String message) {
