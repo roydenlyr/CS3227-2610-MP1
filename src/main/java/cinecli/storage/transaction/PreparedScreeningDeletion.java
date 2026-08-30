@@ -35,26 +35,56 @@ public final class PreparedScreeningDeletion extends PreparedCatalogDeletion {
         this.occupiedSeatCount = occupiedSeatCount;
     }
 
+    /**
+     * Returns the identifier of the Screening scheduled for deletion.
+     *
+     * @return Screening identifier.
+     */
     public String screeningId() {
         return screening.id();
     }
 
+    /**
+     * Returns the identifier of the Screening's parent Movie.
+     *
+     * @return Parent Movie identifier.
+     */
     public String parentMovieId() {
         return parentMovie.id();
     }
 
+    /**
+     * Returns the title of the Screening's parent Movie.
+     *
+     * @return Parent Movie title.
+     */
     public String parentMovieTitle() {
         return parentMovie.title();
     }
 
+    /**
+     * Returns the scheduled start time of the Screening.
+     *
+     * @return Screening start time.
+     */
     public java.time.LocalDateTime startsAt() {
         return screening.startsAt();
     }
 
+    /**
+     * Returns the one-based position shown for the Screening in its parent Movie's list.
+     *
+     * @return One-based display position.
+     */
     public int displayPosition() {
         return displayPosition;
     }
 
+    /**
+     * Returns the number of occupied seats that the deletion would release.
+     *
+     * @return Number of occupied seats.
+     */
     public int occupiedSeatCount() {
         return occupiedSeatCount;
     }

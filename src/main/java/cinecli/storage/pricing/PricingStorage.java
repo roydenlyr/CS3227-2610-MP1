@@ -38,6 +38,12 @@ public final class PricingStorage {
         this(runtimePricingPath, PricingStorageOperationHook.NONE);
     }
 
+    /**
+     * Creates pricing storage with a hook for controlled storage-operation testing.
+     *
+     * @param runtimePricingPath Mutable runtime pricing path.
+     * @param operationHook Hook invoked before storage operations.
+     */
     PricingStorage(Path runtimePricingPath, PricingStorageOperationHook operationHook) {
         this.runtimePricingPath = Objects.requireNonNull(runtimePricingPath).toAbsolutePath().normalize();
         this.operationHook = Objects.requireNonNull(operationHook);
@@ -112,6 +118,13 @@ public final class PricingStorage {
         }
     }
 
+    /**
+     * Serializes a complete pricing state in the current tab-separated format.
+     *
+     * @param pricing Complete pricing state.
+     * @return Serialized pricing text.
+     * @throws PricingStorageException If the pricing state is {@code null}.
+     */
     static String serialize(Pricing pricing) throws PricingStorageException {
         if (pricing == null) {
             throw new PricingStorageException("Proposed pricing must not be null.");

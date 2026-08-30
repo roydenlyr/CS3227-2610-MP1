@@ -408,9 +408,11 @@ public final class MovieManagementApplication {
         return candidate;
     }
 
+    /** Carries either a submitted input line or a terminal workflow outcome. */
     private record ReadResult(String line, AdminWorkflowOutcome outcome) {
     }
 
+    /** Carries a requested value, cancellation state, or terminal workflow outcome. */
     private static final class ValueResult<T> {
         private final T value;
         private final boolean isCancelled;
@@ -435,6 +437,7 @@ public final class MovieManagementApplication {
         }
     }
 
+    /** Carries a selected Movie index, cancellation state, or terminal workflow outcome. */
     private record TargetResult(
             int index, boolean isBack, boolean isCancelled, AdminWorkflowOutcome outcome) {
         private static TargetResult index(int index) {
@@ -454,6 +457,7 @@ public final class MovieManagementApplication {
         }
     }
 
+    /** Carries a confirmation response or a terminal workflow outcome. */
     private record ConfirmationResult(boolean isConfirmed, AdminWorkflowOutcome outcome) {
         private static ConfirmationResult confirmed() {
             return new ConfirmationResult(true, null);

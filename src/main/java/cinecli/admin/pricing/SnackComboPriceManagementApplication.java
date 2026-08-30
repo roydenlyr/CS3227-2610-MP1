@@ -186,9 +186,11 @@ public final class SnackComboPriceManagementApplication {
                 ? AdminWorkflowOutcome.BACK : AdminWorkflowOutcome.TERMINATED;
     }
 
+    /** Carries either a submitted input line or a terminal workflow outcome. */
     private record ReadResult(String line, AdminWorkflowOutcome outcome) {
     }
 
+    /** Carries a selected snack or combo index, cancellation state, or workflow outcome. */
     private record TargetResult(int index, boolean isCancelled, AdminWorkflowOutcome outcome) {
         private static TargetResult index(int index) {
             return new TargetResult(index, false, null);
@@ -203,6 +205,7 @@ public final class SnackComboPriceManagementApplication {
         }
     }
 
+    /** Carries a requested value, cancellation state, or terminal workflow outcome. */
     private static final class ValueResult<T> {
         private final T value;
         private final boolean isCancelled;
@@ -227,6 +230,7 @@ public final class SnackComboPriceManagementApplication {
         }
     }
 
+    /** Carries a confirmation response or a terminal workflow outcome. */
     private record ConfirmationResult(boolean isConfirmed, AdminWorkflowOutcome outcome) {
         private static ConfirmationResult confirmed() {
             return new ConfirmationResult(true, null);

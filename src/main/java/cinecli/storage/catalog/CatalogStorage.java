@@ -42,6 +42,13 @@ public final class CatalogStorage {
         this(runtimeCatalogPath, defaultCatalogResource, CatalogStorageOperationHook.NONE);
     }
 
+    /**
+     * Creates catalog storage with a hook for controlled storage-operation testing.
+     *
+     * @param runtimeCatalogPath Mutable runtime catalog path.
+     * @param defaultCatalogResource Classpath resource copied when runtime data is missing.
+     * @param operationHook Hook invoked before storage operations.
+     */
     CatalogStorage(
             Path runtimeCatalogPath,
             String defaultCatalogResource,
@@ -120,6 +127,13 @@ public final class CatalogStorage {
         }
     }
 
+    /**
+     * Serializes a complete Movie catalogue in the current tab-separated format.
+     *
+     * @param movies Movies in persisted display order.
+     * @return Serialized catalogue text.
+     * @throws CatalogStorageException If the catalogue contains a null value.
+     */
     static String serialize(List<Movie> movies) throws CatalogStorageException {
         if (movies == null) {
             throw new CatalogStorageException("Proposed catalogue must not be null.");

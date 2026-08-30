@@ -34,6 +34,11 @@ public final class Utf8Terminal implements AdminTerminal {
         this.errorOutput = Objects.requireNonNull(errorOutput);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @return The next submitted line, global command, end-of-input marker, or input failure.
+     */
     @Override
     public TerminalInput readLine() {
         try {
@@ -47,11 +52,23 @@ public final class Utf8Terminal implements AdminTerminal {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @param text Text to write to the normal output stream.
+     * @return Whether the text was written and flushed successfully.
+     */
     @Override
     public boolean write(String text) {
         return writeTo(output, text);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @param text Text to write to the error output stream.
+     * @return Whether the text was written and flushed successfully.
+     */
     @Override
     public boolean writeError(String text) {
         return writeTo(errorOutput, text);

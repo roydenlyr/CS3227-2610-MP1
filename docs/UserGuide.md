@@ -1,298 +1,274 @@
 # User Guide
 
-## Project status
+CineCLI is a command-line cinema kiosk with customer and administrator modes.
+Customers can select a screening, seats, tickets, snacks or combos, and an
+optional promotion before receiving a bill. Administrators can manage movies,
+screenings, prices, and promotions.
 
-CineCLI currently provides a customer workflow from the welcome screen to the
-movie catalog, screening selection, terminal seat selection, demographic ticket
-selection, optional snacks and combos, an optional promo code, and an itemized
-bill. Each movie displays its content rating and lettered screening dates and
-times.
+## Contents
 
-Seat occupancy is stored temporarily until booking records become the source of
-truth. Global ticket, snack/combo, and promotion pricing is stored separately in
-runtime data. Ticket assignments, snack and combo choices, applied promo codes,
-and bills remain session-only price snapshots. CineCLI also provides an
-unauthenticated administrator interface for movie, screening, and pricing/
-promotion management. Payment and complete booking records are not part of this
-milestone.
+- [Getting started](#getting-started)
+- [Global commands](#global-commands)
+- [Customer mode](#customer-mode)
+  - [Choose a screening and seats](#choose-a-screening-and-seats)
+  - [Choose tickets, snacks, and a promotion](#choose-tickets-snacks-and-a-promotion)
+  - [Review the bill](#review-the-bill)
+- [Administrator mode](#administrator-mode)
+  - [Movie management](#movie-management)
+  - [Screening management](#screening-management)
+  - [Price management](#price-management)
+  - [Promotion management](#promotion-management)
+- [Data persistence](#data-persistence)
+- [Troubleshooting](#troubleshooting)
 
-## Prerequisite
+## Getting started
 
-Install Java 25 LTS and ensure `java --version` reports Java 25.
+Install Java 25 LTS, then build and run CineCLI from the project root.
 
-## Build and run
+On Windows:
 
-From the project root on Windows:
-
-```powershell
+~~~powershell
 .\mvnw.cmd clean verify
 java -jar target\cinecli-0.1.0-SNAPSHOT.jar
-```
+~~~
 
-On macOS or Linux, use:
+On macOS or Linux:
 
-```shell
+~~~shell
 sh ./mvnw clean verify
 java -jar target/cinecli-0.1.0-SNAPSHOT.jar
-```
+~~~
 
-## View the movie catalog
+The application starts in Customer Mode. Press ENTER at the welcome screen to
+display the movie catalog.
 
-1. Start CineCLI.
-2. At the welcome screen, the application displays:
+## Global commands
 
-   ```text
-   Welcome to CineCLI
-   Press ENTER to proceed
-   ```
+At every prompt, CineCLI accepts the following commands. Commands ignore letter
+case and surrounding whitespace.
 
-3. Press ENTER. CineCLI displays the movie catalog in persisted order. For
-   example:
+| Command | Result |
+| --- | --- |
+| <code>/admin</code> | Opens Administrator Mode. An unfinished customer purchase is discarded. |
+| <code>/customer</code> | Opens a new Customer Mode session. |
+| <code>/exit</code> | Exits CineCLI. |
 
-   ```text
-   Movie Catalog
-   1. Orbit of Echoes
-      Rating: PG13
-      Screenings:
-      A. 29 Aug 2026, 13:30
-      B. 29 Aug 2026, 18:00
-   ```
+Cancellation commands are different from global commands:
 
-If the catalog contains no movies, CineCLI displays `No movies are currently
-available.`
+| Input | Where it works | Result |
+| --- | --- | --- |
+| <code>CANCEL</code> or <code>/cancel</code> | Customer selection and entry prompts | Discards the unfinished purchase and returns to the Customer Mode welcome screen. |
+| <code>/cancel</code> | Administrator add, edit, delete, and price-entry workflows | Cancels the current administrator operation without saving it. |
+| <code>N</code> | Administrator confirmation prompts | Cancels the displayed change without saving it. |
+| <code>0</code> | Menu-specific | Follows the action shown by that menu. For example, it finishes customer snack selection, returns from a management menu, or returns to Customer Mode from the administrator home. |
 
-## Select a screening and seats
+<code>CANCEL</code> by itself is not an administrator cancellation command.
+Likewise, <code>0</code> does not have one universal meaning.
 
-1. Combine the movie number and timing letter to select a screening. For example,
-   enter `3B` for the second timing of the third movie. Selection codes are
-   case-insensitive.
-2. CineCLI displays the fixed seating layout. `G` is closest to `SCREEN`, and the
-   numeric axis is below row `A`, furthest from the screen:
+## Customer Mode
 
-   ```text
-                                  SCREEN
-       ============================================================
-   G    O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O
-   F    O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O
-   E    O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O
-   D    O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O
-   C    O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O
-   B    O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O
-   A    O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O  O
-        1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20
-   ```
+The catalog lists movies in saved order, with each movie's content rating and
+lettered screening times. If no movies are available, CineCLI displays
+<code>No movies are currently available.</code>
 
-3. `O` represents an available seat. `X` represents either a previously confirmed
-   seat or a tentative selection in the current session.
-4. Enter one or more coordinates separated by spaces, such as `G4 G5`.
-5. Review the updated map and enter `Y` to keep the selection tentative while
-   you choose ticket types, snacks, and an optional promotion. Enter `N` to
-   clear the tentative selection and choose again. Enter `CANCEL` at the
-   coordinate prompt to leave without confirming seats.
+### Choose a screening and seats
 
-The selected seats are not written at this point. CineCLI rejects malformed,
-duplicate, or already-taken coordinates and asks for another selection.
+1. Enter the movie number followed by its screening letter, such as <code>3B</code>.
+   The code is case-insensitive.
+2. Enter one or more seat coordinates separated by spaces, such as
+   <code>G4 G5</code>. The map has rows <code>A</code> through <code>G</code> and seat
+   numbers <code>1</code> through <code>20</code>; row <code>G</code> is closest to the
+   screen. <code>O</code> is available, while <code>X</code> is taken or selected
+   tentatively in the current session.
+3. Enter <code>Y</code> to keep the selected seats while you choose tickets and
+   extras. Enter <code>N</code> to clear that selection and choose seats again.
 
-## Choose a ticket type
+CineCLI rejects malformed, duplicate, or already-taken seat coordinates and asks
+you to try again. Selecting seats is not the final confirmation: seats are
+recorded only after the bill has been prepared successfully.
 
-After the tentative seats are selected, CineCLI displays the fixed ticket
-identities with the prices loaded for the current session. A new runtime data directory receives the
-following seeded prices:
+### Choose tickets, snacks, and a promotion
 
-```text
+For each selected seat, choose one ticket type. CineCLI prompts for seats in
+coordinate order, regardless of the order in which you entered them.
+
+~~~text
 Ticket Types
-1. Adult - S$11.00
-2. Senior - S$4.50
-3. Student - S$7.00
-```
+1. Adult
+2. Senior
+3. Student
+~~~
 
-CineCLI requests one ticket type for each tentatively selected seat, in coordinate order. For
-example, seats `G4 G5` are prompted as `G4` followed by `G5`, even if they were
-entered in a different order. Enter `1`, `2`, or `3` at each prompt. Invalid,
-blank, or unavailable numbers are rejected, and CineCLI asks again for the same
-seat before moving on.
+The menu shows the current prices. Enter <code>1</code>, <code>2</code>, or
+<code>3</code>; invalid choices are rejected and the same seat is prompted again.
 
-## Choose a snack or combo
+Next, choose zero or more snacks or combos. Enter an item number, then a positive
+whole-number quantity. Enter <code>0</code> at the item prompt to finish; entering
+<code>0</code> immediately skips snacks and combos. Choosing the same item again
+replaces its previous quantity.
 
-After every tentatively selected seat has a ticket type, CineCLI displays the fixed
-snack/combo identities with the prices loaded for the current session. A new
-runtime data directory receives the following seeded prices:
+Finally, enter one available promo code or press ENTER to skip. Promo codes are
+case-insensitive and surrounding whitespace is ignored. Only one promotion can be
+applied.
 
-```text
-Snack and Combo Menu
-Snacks:
-1. Popcorn - S$5.00
-2. Nachos - S$6.00
-3. Soft Drink - S$3.00
-Combos:
-4. Popcorn Combo (Popcorn + Soft Drink) - S$7.00
-5. Nachos Combo (Nachos + Soft Drink) - S$8.00
-0. Finish selection (or skip if none selected)
-```
+### Review the bill
 
-1. Enter an item number from `1` through `5`.
-2. Enter a positive whole-number quantity when prompted. CineCLI acknowledges the
-   item, quantity, and unit price.
-3. Repeat the item and quantity steps to choose more a la carte items or combos.
-4. Enter `0` at the item prompt to finish. CineCLI displays all selected items in
-   their original selection order. Entering `0` before adding an item skips snacks
-   and combos.
+The bill shows the selected movie and screening, ticket assignments, snack and
+combo quantities, any promotion, the discount, and the total payable amount.
+CineCLI uses Singapore dollars and cents. It does not process payment or create a
+booking record.
 
-Choosing the same item again replaces its earlier quantity instead of creating a
-duplicate line. CineCLI rejects malformed or unavailable item numbers and asks for
-another item. It rejects zero, negative, fractional, nonnumeric, and out-of-range
-quantities, then asks again for the quantity of the same item.
+After a bill is displayed, press ENTER to start a new customer session, or use a
+global command.
 
-Displayed prices beside selections remain unit prices. Quantities contribute to
-the snack subtotal in the final bill. Selections are not persisted or attached to
-a booking record.
+## Administrator Mode
 
-## Apply a promo code and review the bill
+Enter <code>/admin</code> to open the administrator home:
 
-After snack selection, CineCLI accepts one optional promo code. In a newly
-initialized runtime data directory, the available codes are:
-
-- `CS2103` applies 20% off the complete ticket-and-snack subtotal.
-- `CS3227` applies 99% off the complete ticket-and-snack subtotal.
-
-Promo codes are case-insensitive, and surrounding whitespace is ignored. Press
-ENTER on a blank line to skip the promotion. A nonblank unsupported code is
-rejected and the same prompt is shown again. Only one code can be applied; promo
-codes cannot be stacked.
-
-CineCLI constructs the complete four-section bill in memory, atomically confirms
-the selected seats, and then displays the bill. If the final confirmation detects
-that a seat was taken in the meantime, no bill is displayed and CineCLI returns
-to seat selection. If final persistence fails, no bill is displayed. The ticket section identifies the movie
-and screening time before listing each seat, demographic ticket type, and unit
-price. The snack section lists each distinct selection, its quantity, and its unit
-price. Combo contents wrap onto an indented second line. The promotion section
-shows the applied code, discount percentage, and amount saved. The final section
-repeats the pre-discount subtotal and discount before the payable total. For
-example:
-
-```text
-============================================================
-                        BILL SUMMARY
-============================================================
-
-TICKETS
-------------------------------------------------------------
-Movie: Orbit of Echoes
-Time: 29 Aug 2026, 13:30
-
-Seat        Type                                  Unit Price
-------------------------------------------------------------
-G4          Adult                                    S$11.00
-G5          Senior                                    S$4.50
-------------------------------------------------------------
-Ticket Subtotal:                                     S$15.50
-
-SNACKS AND COMBOS
-------------------------------------------------------------
-Qty         Item                                  Unit Price
-------------------------------------------------------------
-2           Popcorn Combo                             S$7.00
-            (Popcorn + Soft Drink)
-3           Nachos                                    S$6.00
-------------------------------------------------------------
-Snack Subtotal:                                      S$32.00
-
-PROMOTION
-------------------------------------------------------------
-Promo Code:                                           CS2103
-Discount:                                            20% OFF
-Amount Saved:                                        -S$9.50
-
-============================================================
-Subtotal:                                            S$47.50
-Discount:                                            -S$9.50
-------------------------------------------------------------
-TOTAL:                                               S$38.00
-============================================================
-```
-
-All calculations use exact Singapore cents. If applying a percentage produces a
-fraction of a cent, the final payable total is rounded to the nearest cent, with a
-half cent rounded up. For example, `CS3227` reduces a S$4.50 Senior ticket to
-S$0.05. Currency amounts use comma grouping when necessary. When no code is
-entered, the promotion section shows `None`, `0% OFF`, and `-S$0.00`. Discount
-values use a leading minus sign because they are adjustments subtracted from the
-subtotal. CineCLI displays the bill but does not process payment.
-
-## Runtime data
-
-On first launch from a working directory without `data/runtime/catalog.tsv`,
-CineCLI creates that file from fictional defaults bundled in the JAR. Later
-launches use the existing runtime file without replacing it.
-
-Browsing a screening treats a missing `data/runtime/seats.tsv` as empty and does
-not create it. The file is created only by the first successful final seat
-confirmation. Confirmed selections are stored by screening ID and seat coordinate.
-This file is temporary and will be replaced by booking-owned seat allocations
-when booking persistence is implemented.
-
-After the welcome screen and before CineCLI displays the catalog, a missing
-`data/runtime/pricing.tsv` is atomically seeded with the current default ticket,
-snack/combo, and promotion values. Later launches load the existing pricing file;
-they do not replace it. The menu and promo prompt show the values loaded at the
-start of the session.
-
-The price attached to each ticket or snack/combo selection, and the code and
-percentage of an applied promotion, are captured when selected. A later pricing
-change therefore cannot alter an already-created selection or bill.
-
-Ticket assignments, snack and combo choices, applied promo codes, and bills do
-not create additional runtime data files.
-
-If a catalog, pricing, or seat file is malformed, CineCLI displays a clear error
-and does not use partial or invented data. A malformed file is not overwritten
-automatically. A pricing failure ends the customer session before catalog or seat
-state is accessed, so it cannot initialize or alter `seats.tsv`. Restore valid
-data, or remove a malformed catalog if the bundled catalog defaults should be
-recreated on the next launch. See `data/README.md` for the supported
-`pricing.tsv` format.
-
-## Switch roles or exit
-
-At every customer or administrator prompt, you may enter `/admin`, `/customer`,
-or `/exit`. Commands ignore surrounding whitespace and letter case. `/admin`
-discards any unfinished customer purchase and opens the administrator home.
-`/customer` opens a fresh customer session; `/exit` ends CineCLI. Local
-`/cancel` and Back/`0` choices only abandon the current uncommitted workflow.
-
-## Administrator home
-
-Enter `/admin` from any prompt. The administrator home provides:
-
-```text
+~~~text
 Administrator Home
 1. Movie Management
 2. Screening Management
 3. Pricing and Promotions Management
 0. Return to customer mode
-```
+~~~
 
-Choose `0` or enter `/customer` to return to the kiosk. The same global commands
-remain available within every management workflow.
+Administrator changes are shown in a preview and saved only after you enter
+<code>Y</code>. Entering <code>N</code> or <code>/cancel</code> abandons the
+proposed change.
 
-### Manage movies and screenings
+### Movie management
 
-Movie Management lists movies in persisted order and provides List, Add, Edit,
-and Delete actions. Screening Management lists screenings with their parent movie
-and provides the corresponding actions. Follow the displayed numbered prompts.
-Each change is previewed and requires `Y` confirmation; `N` or `/cancel` leaves
-the persisted data unchanged. Deleting a movie removes its child screenings and
-their temporary occupied-seat records. Deleting a screening removes only that
-screening's temporary occupied-seat records; editing its date or time retains
-them.
+Movie Management lists each movie with its ID, content rating, and number of
+screenings.
 
-### Manage pricing and promotions
+~~~text
+Movie Management
 
-Pricing and Promotions Management leads to ticket-price, snack/combo-price, and
-promotion workflows. Ticket and snack/combo identities are fixed; only their
-prices may change. Prices must be between `S$0.01` and `S$9,999.99` with two
-decimal places. Promotions can be listed, added, edited, or deleted; percentages
-must be whole numbers from `1` through `100`. Every change is previewed and
-requires `Y` confirmation. A failed save is reported and does not replace the
-existing `pricing.tsv`.
+Actions
+1. Add movie
+2. Edit movie
+3. Delete movie
+0. Back
+~~~
+
+- Add: choose <code>1</code>, enter a nonblank title, choose <code>1</code>
+  (PG13), <code>2</code> (M18), or <code>3</code> (R21), then confirm the preview.
+- Edit: choose <code>2</code>, select a movie number, change its title or rating,
+  review the changes, then confirm.
+- Delete: choose <code>3</code>, select a movie number, and confirm the deletion.
+
+Deleting a movie also deletes its screenings and their temporary occupied-seat
+records. <code>0</code> returns to the administrator home.
+
+### Screening management
+
+Screening Management lists every screening with its parent movie, IDs, and start
+time.
+
+~~~text
+Screening Management
+
+Actions
+1. Add screening
+2. Edit screening
+3. Delete screening
+0. Back
+~~~
+
+- Add: choose <code>1</code>, select a parent movie, enter a date as
+  <code>yyyy-MM-dd</code> and a time as <code>HH:mm</code>, then confirm the preview.
+- Edit: choose <code>2</code>, select a screening number, change its date or time,
+  review the changes, then confirm. The parent movie cannot be changed.
+- Delete: choose <code>3</code>, select a screening number, and confirm the
+  deletion.
+
+Editing a screening retains its temporary occupied seats. Deleting a screening
+removes only that screening's temporary occupied-seat records. <code>0</code>
+returns to the administrator home.
+
+### Price management
+
+From Pricing and Promotions Management, choose the ticket or snack/combo price
+section:
+
+~~~text
+Pricing and Promotions Management
+1. Ticket Prices
+2. Snack/Combo Prices
+3. Promotions
+0. Back
+~~~
+
+Each price-management section provides one edit action:
+
+~~~text
+Ticket Price Management
+1. Edit ticket price
+0. Back
+
+Snack and Combo Price Management
+1. Edit snack/combo price
+0. Back
+~~~
+
+Choose <code>1</code>, select a displayed ticket (<code>1</code>-<code>3</code>) or
+snack/combo (<code>1</code>-<code>5</code>), enter a new price such as
+<code>11.50</code>, and confirm the preview. Prices must be from
+<code>S$0.01</code> to <code>S$9,999.99</code> and have exactly two decimal places.
+Ticket and snack/combo items are fixed; only their prices can be changed.
+
+### Promotion management
+
+From Pricing and Promotions Management, choose <code>3</code> to open Promotion
+Management:
+
+~~~text
+Promotion Management
+
+Actions
+1. Add promotion
+2. Edit promotion
+3. Delete promotion
+0. Back
+~~~
+
+- Add: choose <code>1</code>, enter a promotion code and a whole discount
+  percentage from <code>1</code> through <code>100</code>, then confirm.
+- Edit: choose <code>2</code>, select a promotion, change its code or percentage,
+  review the changes, then confirm.
+- Delete: choose <code>3</code>, select a promotion, and confirm.
+
+Promotion codes are normalized to uppercase. They must contain 1 to 32 ASCII
+letters, digits, underscores, or hyphens, begin with a letter or digit, and be
+unique.
+
+## Data persistence
+
+CineCLI stores runtime data relative to the directory from which you start the
+application:
+
+- <code>data/runtime/catalog.tsv</code> stores the catalog and administrator movie
+  and screening changes.
+- <code>data/runtime/pricing.tsv</code> stores ticket prices, snack/combo prices,
+  and promotions.
+- <code>data/runtime/seats.tsv</code> stores confirmed seat occupancy.
+
+On first use, CineCLI creates default catalog and pricing data if those files are
+missing. The seat file is created only after a successful final seat confirmation.
+Confirmed seats remain unavailable on later runs. Customer selections other than
+confirmed seats are not saved.
+
+If data cannot be read or saved, CineCLI displays an error and does not replace the
+affected file with invented values. For the supported file formats, see
+<code>data/README.md</code>.
+
+## Troubleshooting
+
+| Situation | What to do |
+| --- | --- |
+| A menu rejects your input. | Use the format displayed in the prompt. CineCLI keeps the current prompt active after invalid input. |
+| You want to abandon an unfinished customer purchase. | Enter <code>CANCEL</code> or <code>/cancel</code> at a customer selection or entry prompt. |
+| You want to abandon an administrator change. | Enter <code>/cancel</code> where offered, or enter <code>N</code> at its preview. |
+| CineCLI reports that data cannot be loaded or saved. | Correct or restore the affected runtime file under <code>data/runtime/</code>, then start CineCLI again. |
+| The catalog is empty. | Add movies and screenings in Administrator Mode, or restore a valid catalog file. |

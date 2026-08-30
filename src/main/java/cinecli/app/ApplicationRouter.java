@@ -115,6 +115,7 @@ public final class ApplicationRouter {
         return Role.ADMINISTRATOR;
     }
 
+    /** Identifies the role whose workflow is currently active. */
     private enum Role {
         CUSTOMER,
         ADMINISTRATOR

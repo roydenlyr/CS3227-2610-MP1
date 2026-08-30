@@ -44,6 +44,12 @@ final class MovieManagementText {
     private static final DateTimeFormatter SCREENING_TIME = DateTimeFormatter
             .ofPattern("dd MMM uuuu, HH:mm", Locale.ENGLISH);
 
+    /**
+     * Returns the Movie management screen for the supplied catalogue.
+     *
+     * @param movies Movies in display order.
+     * @return Complete management screen.
+     */
     String management(List<Movie> movies) {
         StringBuilder screen = new StringBuilder("Movie Management\n\nMovies\n");
         if (movies.isEmpty()) {
@@ -61,6 +67,15 @@ final class MovieManagementText {
                 + "0. Back\nEnter choice:\n").toString();
     }
 
+    /**
+     * Returns the confirmation preview for a proposed Movie addition.
+     *
+     * @param id Proposed Movie identifier.
+     * @param title Proposed Movie title.
+     * @param rating Proposed content rating.
+     * @param position Proposed one-based display position.
+     * @return Complete addition preview.
+     */
     String addPreview(String id, String title, ContentRating rating, int position) {
         return "Add Movie Preview\n"
                 + "ID: " + id + "\n"
@@ -70,6 +85,15 @@ final class MovieManagementText {
                 + "Confirm add? (Y/N):\n";
     }
 
+    /**
+     * Returns the edit menu for a Movie and its tentative replacement values.
+     *
+     * @param movie Original Movie.
+     * @param position One-based Movie display position.
+     * @param title Tentative title.
+     * @param rating Tentative content rating.
+     * @return Complete edit menu.
+     */
     String editMenu(
             Movie movie, int position, String title, ContentRating rating) {
         return "Edit Movie\nID: " + movie.id() + "\nDisplay position: " + position
@@ -78,6 +102,15 @@ final class MovieManagementText {
                 + "0. Cancel edit\nEnter choice:\n";
     }
 
+    /**
+     * Returns the confirmation preview for proposed Movie changes.
+     *
+     * @param original Original Movie.
+     * @param position One-based Movie display position.
+     * @param title Tentative title.
+     * @param rating Tentative content rating.
+     * @return Complete edit preview.
+     */
     String editPreview(
             Movie original, int position, String title, ContentRating rating) {
         String titleLine = title.equals(original.title())
@@ -89,6 +122,12 @@ final class MovieManagementText {
                 + "\nConfirm edit? (Y/N):\n";
     }
 
+    /**
+     * Returns the confirmation preview for a prepared Movie deletion.
+     *
+     * @param deletion Prepared deletion and its cascading impact.
+     * @return Complete deletion preview.
+     */
     String deletePreview(PreparedMovieDeletion deletion) {
         StringBuilder preview = new StringBuilder("Delete Movie Preview\n")
                 .append("ID: ").append(deletion.movieId()).append('\n')
@@ -113,28 +152,67 @@ final class MovieManagementText {
         return preview.append("Confirm delete? (Y/N):\n").toString();
     }
 
+    /**
+     * Returns the prompt for selecting a Movie for an action.
+     *
+     * @param action Action to describe.
+     * @return Movie-selection prompt.
+     */
     String targetPrompt(String action) {
         return "Enter movie number to " + action + " (0 to go back):\n";
     }
 
+    /**
+     * Returns the validation message for an invalid Movie selection.
+     *
+     * @param count Number of selectable Movies.
+     * @return Selection-error message.
+     */
     String targetError(int count) {
         return "Enter a movie number from 1 to " + count + ", or 0 to go back.\n";
     }
 
+    /**
+     * Returns the success message for an added Movie.
+     *
+     * @param title Added Movie title.
+     * @param id Added Movie identifier.
+     * @return Addition-success message.
+     */
     String added(String title, String id) {
         return "Movie added: " + title + " [" + id + "].\n";
     }
 
+    /**
+     * Returns the success message for an updated Movie.
+     *
+     * @param title Updated Movie title.
+     * @param id Updated Movie identifier.
+     * @return Update-success message.
+     */
     String updated(String title, String id) {
         return "Movie updated: " + title + " [" + id + "].\n";
     }
 
+    /**
+     * Returns the success message for a committed Movie deletion.
+     *
+     * @param result Committed deletion result.
+     * @return Deletion-success message.
+     */
     String deleted(MovieDeletionResult result) {
         return "Movie deleted: " + result.title() + " [" + result.movieId()
                 + "]; removed " + result.screeningCount() + " screening(s) and "
                 + result.occupiedSeatCount() + " occupied seat(s).\n";
     }
 
+    /**
+     * Returns a storage-failure message with the supplied context and cause message.
+     *
+     * @param prefix Contextual failure prefix.
+     * @param exception Storage failure to describe.
+     * @return Complete failure message.
+     */
     String storageFailure(String prefix, Exception exception) {
         return prefix + exception.getMessage() + "\n";
     }

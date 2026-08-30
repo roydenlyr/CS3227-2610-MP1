@@ -6,6 +6,7 @@ import java.util.regex.Pattern;
 public final class AdminInputRules {
     private static final Pattern NUMBER_PATTERN = Pattern.compile("0|[1-9][0-9]*");
 
+    /** Represents the outcome of parsing a confirmation response. */
     public enum Confirmation {
         CONFIRMED,
         CANCELLED,

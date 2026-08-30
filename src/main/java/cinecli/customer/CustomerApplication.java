@@ -419,9 +419,11 @@ public final class CustomerApplication {
         return Set.copyOf(ids);
     }
 
+    /** Couples a selected Screening with its parent Movie. */
     private record SelectedScreening(Movie movie, Screening screening) {
     }
 
+    /** Carries either a submitted input line or a terminal workflow outcome. */
     private record InputResult(String line, CustomerWorkflowOutcome outcome) {
         private static InputResult line(String line) {
             return new InputResult(Objects.requireNonNull(line), null);
@@ -432,6 +434,7 @@ public final class CustomerApplication {
         }
     }
 
+    /** Carries a workflow value or the outcome that interrupted its acquisition. */
     private record Result<T>(T value, CustomerWorkflowOutcome outcome) {
         private static <T> Result<T> value(T value) {
             return new Result<>(Objects.requireNonNull(value), null);

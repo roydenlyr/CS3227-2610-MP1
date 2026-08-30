@@ -106,6 +106,12 @@ public final class Pricing {
                 .findFirst();
     }
 
+    /**
+     * Returns whether this pricing state has the same ticket prices, snack prices, and promotions.
+     *
+     * @param other Object to compare with this pricing state.
+     * @return Whether the supplied object represents an equal pricing state.
+     */
     @Override
     public boolean equals(Object other) {
         if (this == other) {
@@ -119,6 +125,11 @@ public final class Pricing {
                 && promotions.equals(pricing.promotions);
     }
 
+    /**
+     * Returns a hash code for this pricing state.
+     *
+     * @return Hash code derived from the prices and promotions.
+     */
     @Override
     public int hashCode() {
         return Objects.hash(ticketPricesInCents, snackPricesInCents, promotions);

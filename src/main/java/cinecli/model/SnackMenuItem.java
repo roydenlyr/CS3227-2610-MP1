@@ -19,6 +19,13 @@ public enum SnackMenuItem {
     private final String displayName;
     private final boolean isCombo;
 
+    /**
+     * Creates a menu item with its displayed selection details.
+     *
+     * @param menuNumber One-based number shown in menus.
+     * @param displayName Customer-facing item name.
+     * @param isCombo Whether the item contains multiple products.
+     */
     SnackMenuItem(int menuNumber, String displayName, boolean isCombo) {
         this.menuNumber = menuNumber;
         this.displayName = displayName;

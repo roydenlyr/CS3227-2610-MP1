@@ -25,6 +25,12 @@ final class PromotionManagementText {
     static final String NO_CHANGES = "No promotion changes have been made.\n";
     static final String CONFIRMATION_ERROR = "Enter Y to confirm or N to cancel.\n";
 
+    /**
+     * Returns the Promotion management screen.
+     *
+     * @param promotions Promotions in display order.
+     * @return Complete management screen.
+     */
     String management(List<PromoCode> promotions) {
         StringBuilder screen = new StringBuilder("Promotion Management\n\nPromotions\n");
         if (promotions.isEmpty()) {
@@ -40,17 +46,39 @@ final class PromotionManagementText {
                 + "0. Back\nEnter choice:\n").toString();
     }
 
+    /**
+     * Returns the confirmation preview for a proposed promotion addition.
+     *
+     * @param promotion Proposed promotion.
+     * @return Complete addition preview.
+     */
     String addPreview(PromoCode promotion) {
         return "Add Promotion Preview\nCode: " + promotion.code() + "\nDiscount: "
                 + promotion.discountPercentage() + "%\nConfirm add? (Y/N):\n";
     }
 
+    /**
+     * Returns the edit menu for a promotion and its tentative replacement values.
+     *
+     * @param original Original promotion.
+     * @param code Tentative promotion code.
+     * @param percentage Tentative discount percentage.
+     * @return Complete edit menu.
+     */
     String editMenu(PromoCode original, String code, int percentage) {
         return "Edit Promotion\nCode: " + code + "\nDiscount: " + percentage + "%\n\n"
                 + "1. Change code\n2. Change discount percentage\n3. Review changes\n"
                 + "0. Cancel edit\nEnter choice:\n";
     }
 
+    /**
+     * Returns the confirmation preview for proposed promotion changes.
+     *
+     * @param original Original promotion.
+     * @param code Tentative promotion code.
+     * @param percentage Tentative discount percentage.
+     * @return Complete edit preview.
+     */
     String editPreview(PromoCode original, String code, int percentage) {
         String codeLine = code.equals(original.code())
                 ? code + " (unchanged)" : original.code() + " -> " + code;
@@ -60,32 +88,75 @@ final class PromotionManagementText {
                 + "\nConfirm edit? (Y/N):\n";
     }
 
+    /**
+     * Returns the confirmation preview for a promotion deletion.
+     *
+     * @param promotion Promotion to remove.
+     * @return Complete deletion preview.
+     */
     String deletePreview(PromoCode promotion) {
         return "Delete Promotion Preview\nCode: " + promotion.code() + "\nDiscount: "
                 + promotion.discountPercentage() + "%\nWARNING: This promotion will be removed.\n"
                 + "Confirm delete? (Y/N):\n";
     }
 
+    /**
+     * Returns the prompt for selecting a promotion for an action.
+     *
+     * @param action Action to describe.
+     * @return Promotion-selection prompt.
+     */
     String targetPrompt(String action) {
         return "Enter promotion number to " + action + " (0 to go back):\n";
     }
 
+    /**
+     * Returns the validation message for an invalid promotion selection.
+     *
+     * @param count Number of selectable promotions.
+     * @return Selection-error message.
+     */
     String targetError(int count) {
         return "Enter a promotion number from 1 to " + count + ", or 0 to go back.\n";
     }
 
+    /**
+     * Returns the success message for an added promotion.
+     *
+     * @param promotion Added promotion.
+     * @return Addition-success message.
+     */
     String added(PromoCode promotion) {
         return "Promotion added: " + promotion.code() + " (" + promotion.discountPercentage() + "%).\n";
     }
 
+    /**
+     * Returns the success message for an updated promotion.
+     *
+     * @param promotion Updated promotion.
+     * @return Update-success message.
+     */
     String updated(PromoCode promotion) {
         return "Promotion updated: " + promotion.code() + " (" + promotion.discountPercentage() + "%).\n";
     }
 
+    /**
+     * Returns the success message for a deleted promotion.
+     *
+     * @param promotion Deleted promotion.
+     * @return Deletion-success message.
+     */
     String deleted(PromoCode promotion) {
         return "Promotion deleted: " + promotion.code() + " (" + promotion.discountPercentage() + "%).\n";
     }
 
+    /**
+     * Returns a storage-failure message with the supplied context and cause message.
+     *
+     * @param prefix Contextual failure prefix.
+     * @param exception Storage failure to describe.
+     * @return Complete failure message.
+     */
     String storageFailure(String prefix, Exception exception) {
         return prefix + exception.getMessage() + "\n";
     }

@@ -15,6 +15,12 @@ final class SnackComboPriceManagementText {
     static final String EDIT_CANCELLED = "Snack/combo price edit cancelled.\n";
     static final String CONFIRMATION_ERROR = "Enter Y to confirm or N to cancel.\n";
 
+    /**
+     * Returns the Snack and Combo Price management screen.
+     *
+     * @param pricing Current complete pricing state.
+     * @return Complete management screen.
+     */
     String management(Pricing pricing) {
         StringBuilder screen = new StringBuilder("Snack and Combo Price Management\n\nSnack and Combo Prices\n");
         for (SnackMenuItem menuItem : SnackMenuItem.values()) {
@@ -26,15 +32,34 @@ final class SnackComboPriceManagementText {
                 .toString();
     }
 
+    /**
+     * Returns the prompt for selecting a snack or combo to edit.
+     *
+     * @return Snack-and-combo selection prompt.
+     */
     String targetPrompt() {
         return "Enter snack/combo number to edit (0 to cancel):\n";
     }
 
+    /**
+     * Returns the prompt for entering a snack or combo's replacement price.
+     *
+     * @param menuItem Snack or combo being edited.
+     * @return Price-entry prompt.
+     */
     String pricePrompt(SnackMenuItem menuItem) {
         return "Enter new price for " + menuItem.getDisplayName()
                 + " (S$0.01 to S$9,999.99, /cancel to cancel):\n";
     }
 
+    /**
+     * Returns the confirmation preview for a snack or combo price change.
+     *
+     * @param menuItem Snack or combo being edited.
+     * @param originalPriceInCents Current price in cents.
+     * @param proposedPriceInCents Tentative price in cents.
+     * @return Complete edit preview.
+     */
     String editPreview(SnackMenuItem menuItem, int originalPriceInCents, int proposedPriceInCents) {
         return "Edit Snack/Combo Price Preview\n"
                 + "Item: " + menuItem.getDisplayName() + "\n"
@@ -43,11 +68,25 @@ final class SnackComboPriceManagementText {
                 + "Confirm edit? (Y/N):\n";
     }
 
+    /**
+     * Returns the success message for a snack or combo price update.
+     *
+     * @param menuItem Updated snack or combo.
+     * @param priceInCents Updated price in cents.
+     * @return Update-success message.
+     */
     String updated(SnackMenuItem menuItem, int priceInCents) {
         return "Snack/combo price updated: " + menuItem.getDisplayName() + " - "
                 + formatPrice(priceInCents) + ".\n";
     }
 
+    /**
+     * Returns a storage-failure message with the supplied context and cause message.
+     *
+     * @param prefix Contextual failure prefix.
+     * @param exception Storage failure to describe.
+     * @return Complete failure message.
+     */
     String storageFailure(String prefix, Exception exception) {
         return prefix + exception.getMessage() + "\n";
     }

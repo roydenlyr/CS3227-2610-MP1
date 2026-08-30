@@ -16,6 +16,12 @@ public enum TicketType {
     private final int menuNumber;
     private final String displayName;
 
+    /**
+     * Creates a ticket type with its displayed selection details.
+     *
+     * @param menuNumber One-based number shown in menus.
+     * @param displayName Customer-facing ticket type name.
+     */
     TicketType(int menuNumber, String displayName) {
         this.menuNumber = menuNumber;
         this.displayName = displayName;

@@ -18,6 +18,12 @@ final class ScreeningInputRules {
             .ofPattern("HH:mm")
             .withResolverStyle(ResolverStyle.STRICT);
 
+    /**
+     * Parses a strict ISO local date.
+     *
+     * @param input Submitted date text.
+     * @return Parsed date, or {@code null} when the input is invalid.
+     */
     LocalDate parseDate(String input) {
         String normalized = input.strip();
         if (!DATE_PATTERN.matcher(normalized).matches()) {
@@ -30,6 +36,12 @@ final class ScreeningInputRules {
         }
     }
 
+    /**
+     * Parses a strict 24-hour local time.
+     *
+     * @param input Submitted time text.
+     * @return Parsed time, or {@code null} when the input is invalid.
+     */
     LocalTime parseTime(String input) {
         String normalized = input.strip();
         if (!TIME_PATTERN.matcher(normalized).matches()) {

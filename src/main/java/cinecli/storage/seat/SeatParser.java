@@ -55,6 +55,12 @@ final class SeatParser {
         return immutableCopy(takenSeatsByScreening);
     }
 
+    /**
+     * Returns whether a value has the screening identifier format accepted by seat storage.
+     *
+     * @param screeningId Value to validate.
+     * @return Whether the value is a valid screening identifier.
+     */
     static boolean isValidScreeningId(String screeningId) {
         return screeningId != null && ID_PATTERN.matcher(screeningId).matches();
     }

@@ -255,9 +255,11 @@ final class CatalogParser {
                 "Malformed catalog '" + sourceDescription + "' at line " + lineNumber + ": " + reason + ".");
     }
 
+    /** Holds a parsed Movie record before its screenings are attached. */
     private record ParsedMovie(String id, String title, ContentRating contentRating) {
     }
 
+    /** Holds a parsed Screening record and its original source line. */
     private record ParsedScreening(String id, String movieId, LocalDateTime startsAt, int lineNumber) {
     }
 }

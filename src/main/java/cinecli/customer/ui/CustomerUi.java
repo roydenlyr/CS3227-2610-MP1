@@ -702,6 +702,7 @@ public final class CustomerUi {
                 Locale.ROOT, "S$%,d.%02d", priceInCents / 100, priceInCents % 100);
     }
 
+    /** Bridges {@link Writer} output to the shared administrator terminal. */
     private static final class TerminalWriter extends Writer {
         private final AdminTerminal terminal;
         private final boolean isError;
@@ -712,6 +713,13 @@ public final class CustomerUi {
             this.isError = isError;
         }
 
+        /**
+         * {@inheritDoc}
+         *
+         * @param characters Characters to write.
+         * @param offset First character to write.
+         * @param length Number of characters to write.
+         */
         @Override
         public void write(char[] characters, int offset, int length) {
             String text = new String(characters, offset, length);
@@ -721,11 +729,13 @@ public final class CustomerUi {
             }
         }
 
+        /** Flushes no additional data because the terminal flushes each write. */
         @Override
         public void flush() {
             // AdminTerminal writes and flushes complete supplied text blocks.
         }
 
+        /** Closes no resources because the application owns the terminal lifecycle. */
         @Override
         public void close() {
             // The application owns the shared terminal lifecycle.

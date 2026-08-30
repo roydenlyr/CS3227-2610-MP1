@@ -10,6 +10,12 @@ final class PricingInputRules {
     private static final int MAXIMUM_PRICE_IN_CENTS = 999_999;
     private static final int MAXIMUM_PERCENTAGE = 100;
 
+    /**
+     * Parses a price with exactly two decimal places within the permitted range.
+     *
+     * @param input Submitted price text.
+     * @return Price in cents, or {@code null} when the input is invalid.
+     */
     Integer parsePriceInCents(String input) {
         String normalized = input.strip();
         if (!PRICE_PATTERN.matcher(normalized).matches()) {
@@ -22,6 +28,12 @@ final class PricingInputRules {
                 ? priceInCents : null;
     }
 
+    /**
+     * Parses a whole discount percentage from one through one hundred.
+     *
+     * @param input Submitted percentage text.
+     * @return Parsed percentage, or {@code null} when the input is invalid.
+     */
     Integer parsePercentage(String input) {
         String normalized = input.strip();
         if (!PERCENTAGE_PATTERN.matcher(normalized).matches()) {

@@ -11,6 +11,12 @@ final class PricingManagementText {
     static final String ACCESS_FAILURE_PREFIX = "Unable to access pricing management: ";
     static final String ACTION_ERROR_WITH_PROMPT = "Enter 0, 1, 2, or 3.\nEnter choice:\n";
 
+    /**
+     * Returns the pricing-and-promotions management screen.
+     *
+     * @param pricing Current complete pricing state.
+     * @return Complete management screen.
+     */
     String management(Pricing pricing) {
         StringBuilder screen = new StringBuilder("Pricing and Promotions Management\n\nTicket Prices\n");
         for (TicketType ticketType : TicketType.values()) {
@@ -38,6 +44,13 @@ final class PricingManagementText {
                 + "0. Back\nEnter choice:\n").toString();
     }
 
+    /**
+     * Returns a storage-failure message with the supplied context and cause message.
+     *
+     * @param prefix Contextual failure prefix.
+     * @param exception Storage failure to describe.
+     * @return Complete failure message.
+     */
     String storageFailure(String prefix, Exception exception) {
         return prefix + exception.getMessage() + "\n";
     }

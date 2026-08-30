@@ -46,6 +46,7 @@ public final class MovieDeletionTransaction {
     private final Path journalPath;
     private final TransactionOperationHook operationHook;
 
+    /** Identifies the durable step currently recorded by a Movie deletion journal. */
     private enum DeletionOperation {
         DELETE_MOVIE,
         DELETE_SCREENING
@@ -651,6 +652,7 @@ public final class MovieDeletionTransaction {
         return new TransactionStorageException("Malformed catalogue transaction journal.");
     }
 
+    /** Captures the durable recovery data for a partially committed Movie deletion. */
     private record Journal(
             DeletionOperation operation,
             String subjectId,
@@ -661,9 +663,11 @@ public final class MovieDeletionTransaction {
             TransactionFileSnapshot<Map<String, Set<SeatCoordinate>>> intendedSeats) {
     }
 
+    /** Couples a Screening with its parent Movie and global display position. */
     private record ScreeningLocation(Movie movie, Screening screening, int displayPosition) {
     }
 
+    /** Signals a commit failure together with whether the target state was already applied. */
     private static final class CommitFailure extends Exception {
         private final Status status;
 

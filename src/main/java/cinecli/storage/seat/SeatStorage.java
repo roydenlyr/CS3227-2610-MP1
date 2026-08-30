@@ -35,6 +35,12 @@ public final class SeatStorage {
         this(runtimeSeatsPath, SeatStorageOperationHook.NONE);
     }
 
+    /**
+     * Creates seat storage with a hook for controlled storage-operation testing.
+     *
+     * @param runtimeSeatsPath Mutable runtime seat occupancy path.
+     * @param operationHook Hook invoked before storage operations.
+     */
     SeatStorage(Path runtimeSeatsPath, SeatStorageOperationHook operationHook) {
         this.runtimeSeatsPath = Objects.requireNonNull(runtimeSeatsPath).toAbsolutePath().normalize();
         this.operationHook = Objects.requireNonNull(operationHook);
@@ -106,6 +112,13 @@ public final class SeatStorage {
         writeAll(intendedSnapshot.occupiedSeatsByScreening());
     }
 
+    /**
+     * Replaces a transaction-owned occupancy snapshot without comparing its current contents.
+     *
+     * @param intendedSnapshot Complete intended state.
+     * @param knownScreeningIds Screening IDs in the intended catalogue.
+     * @throws SeatStorageException If presence changes or persistence fails.
+     */
     void replaceTransactionSnapshot(
             SeatOccupancySnapshot intendedSnapshot, Set<String> knownScreeningIds)
             throws SeatStorageException {
@@ -256,6 +269,12 @@ public final class SeatStorage {
         }
     }
 
+    /**
+     * Serializes occupied seats in the current tab-separated format.
+     *
+     * @param takenSeatsByScreening Occupied seats grouped by screening ID.
+     * @return Serialized seat occupancy text.
+     */
     static String serialize(Map<String, Set<SeatCoordinate>> takenSeatsByScreening) {
         StringBuilder serializedState = new StringBuilder(SeatParser.HEADER_LINE).append('\n');
         Map<String, Set<SeatCoordinate>> sortedState = new TreeMap<>(takenSeatsByScreening);

@@ -51,6 +51,13 @@ public record SeatCoordinate(char row, int number) implements Comparable<SeatCoo
         return new SeatCoordinate(value.charAt(0), Integer.parseInt(value.substring(1)));
     }
 
+    /**
+     * Compares this coordinate with another coordinate by row and then seat number.
+     *
+     * @param other Coordinate to compare with this coordinate.
+     * @return A negative number, zero, or a positive number when this coordinate sorts before,
+     *         equals, or sorts after the other coordinate.
+     */
     @Override
     public int compareTo(SeatCoordinate other) {
         Objects.requireNonNull(other, "other");
@@ -58,6 +65,11 @@ public record SeatCoordinate(char row, int number) implements Comparable<SeatCoo
         return rowComparison != 0 ? rowComparison : Integer.compare(number, other.number);
     }
 
+    /**
+     * Returns this coordinate in its canonical form.
+     *
+     * @return Uppercase row followed by the seat number.
+     */
     @Override
     public String toString() {
         return Character.toString(row) + number;
