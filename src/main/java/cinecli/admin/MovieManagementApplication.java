@@ -9,8 +9,6 @@ import cinecli.storage.catalog.CatalogStorage;
 import cinecli.storage.exception.CatalogStorageException;
 import cinecli.storage.exception.MovieDeletionCommitException;
 import cinecli.storage.exception.MovieDeletionPreparationException;
-import cinecli.storage.exception.TransactionStorageException;
-import cinecli.storage.transaction.CatalogRecoveryGate;
 import cinecli.storage.transaction.MovieDeletionResult;
 import cinecli.storage.transaction.MovieDeletionTransaction;
 import cinecli.storage.transaction.PreparedMovieDeletion;
@@ -25,7 +23,6 @@ import java.util.UUID;
 public final class MovieManagementApplication {
     private final CatalogStorage catalogStorage;
     private final MovieDeletionTransaction deletionTransaction;
-    private final CatalogRecoveryGate recoveryGate;
     private final AdminWorkflowInteraction interaction;
     private final UuidGenerator movieIdGenerator;
     private final AdminInputRules inputRules = new AdminInputRules();
@@ -55,17 +52,12 @@ public final class MovieManagementApplication {
             UuidGenerator movieIdGenerator) {
         this.catalogStorage = catalogStorage;
         this.deletionTransaction = deletionTransaction;
-        this.recoveryGate = new CatalogRecoveryGate(deletionTransaction);
         this.interaction = new AdminWorkflowInteraction(terminal);
         this.movieIdGenerator = movieIdGenerator;
     }
 
     /** Runs Movie management until a typed navigation or termination outcome occurs. */
     public AdminWorkflowOutcome run() {
-        AdminWorkflowOutcome recoveryOutcome = recoverPendingDeletion();
-        if (recoveryOutcome != null) {
-            return recoveryOutcome;
-        }
         while (true) {
             List<Movie> movies;
             try {
@@ -107,18 +99,6 @@ public final class MovieManagementApplication {
             if (outcome != null) {
                 return outcome;
             }
-        }
-    }
-
-    private AdminWorkflowOutcome recoverPendingDeletion() {
-        try {
-            if (recoveryGate.recoverBeforeAccess()
-                    && !write(MovieManagementText.RECOVERY_COMPLETED)) {
-                return AdminWorkflowOutcome.TERMINATED;
-            }
-            return null;
-        } catch (TransactionStorageException exception) {
-            return reportStorageFailure(MovieManagementText.ACCESS_FAILURE_PREFIX, exception);
         }
     }
 

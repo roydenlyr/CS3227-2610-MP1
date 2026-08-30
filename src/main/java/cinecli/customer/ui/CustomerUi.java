@@ -1,6 +1,11 @@
 package cinecli.customer.ui;
 
 import cinecli.customer.parser.ScreeningSelection;
+import cinecli.admin.ui.AdminTerminal;
+import cinecli.admin.ui.InputFailure;
+import cinecli.admin.ui.SubmittedLine;
+import cinecli.admin.ui.TerminalInput;
+import cinecli.app.Utf8Terminal;
 import cinecli.model.Bill;
 import cinecli.model.Movie;
 import cinecli.model.Pricing;
@@ -11,8 +16,6 @@ import cinecli.model.SnackMenuItem;
 import cinecli.model.SnackSelection;
 import cinecli.model.TicketSelection;
 import cinecli.model.TicketType;
-import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.Writer;
@@ -37,7 +40,9 @@ public final class CustomerUi {
             DateTimeFormatter.ofPattern("dd MMM uuuu, HH:mm", Locale.ENGLISH);
     private static final String NO_MOVIES_MESSAGE = "No movies are currently available.";
 
-    private final BufferedReader input;
+    private final AdminTerminal terminal;
+    private final TerminalWriter outputWriter;
+    private final TerminalWriter errorWriter;
     private final PrintWriter output;
     private final PrintWriter errorOutput;
 
@@ -49,9 +54,20 @@ public final class CustomerUi {
      * @param errorOutput Error output destination.
      */
     public CustomerUi(Reader input, Writer output, Writer errorOutput) {
-        this.input = new BufferedReader(Objects.requireNonNull(input));
-        this.output = new PrintWriter(Objects.requireNonNull(output), true);
-        this.errorOutput = new PrintWriter(Objects.requireNonNull(errorOutput), true);
+        this(new Utf8Terminal(input, output, errorOutput));
+    }
+
+    /**
+     * Creates a customer text UI over the shared application terminal.
+     *
+     * @param terminal Shared terminal adapter.
+     */
+    public CustomerUi(AdminTerminal terminal) {
+        this.terminal = Objects.requireNonNull(terminal);
+        this.outputWriter = new TerminalWriter(terminal, false);
+        this.errorWriter = new TerminalWriter(terminal, true);
+        this.output = new PrintWriter(outputWriter, true);
+        this.errorOutput = new PrintWriter(errorWriter, true);
     }
 
     /**
@@ -77,7 +93,20 @@ public final class CustomerUi {
      * @return True if input was submitted, or false if input ended or could not be read.
      */
     public boolean hasUserProceeded() {
-        return readLine() != null;
+        TerminalInput input = readInput();
+        if (input instanceof InputFailure) {
+            showInputFailure();
+        }
+        return input instanceof SubmittedLine;
+    }
+
+    /**
+     * Reads the next typed terminal result after displaying a customer prompt.
+     *
+     * @return Typed terminal result.
+     */
+    public TerminalInput readInput() {
+        return terminal.readLine();
     }
 
     /**
@@ -85,10 +114,10 @@ public final class CustomerUi {
      *
      * @return Submitted code, or null if input ended or could not be read.
      */
-    public String requestScreeningSelection() {
+    public TerminalInput requestScreeningSelection() {
         output.println();
         output.println("Select a screening using the movie number and timing letter (e.g., 3B):");
-        return readLine();
+        return readInput();
     }
 
     /**
@@ -133,9 +162,9 @@ public final class CustomerUi {
      *
      * @return Submitted coordinates, or null if input ended or could not be read.
      */
-    public String requestSeatSelection() {
+    public TerminalInput requestSeatSelection() {
         output.println("Enter seat coordinates separated by spaces (e.g., G4 G5), or CANCEL:");
-        return readLine();
+        return readInput();
     }
 
     /**
@@ -144,10 +173,10 @@ public final class CustomerUi {
      * @param seats Tentatively selected seats.
      * @return Submitted answer, or null if input ended or could not be read.
      */
-    public String requestSeatConfirmation(Set<SeatCoordinate> seats) {
+    public TerminalInput requestSeatConfirmation(Set<SeatCoordinate> seats) {
         String seatList = formatSeatList(seats);
         output.println("Confirm seats " + seatList + "? (Y/N):");
-        return readLine();
+        return readInput();
     }
 
     /**
@@ -207,10 +236,10 @@ public final class CustomerUi {
      * @param seat Confirmed seat requiring a ticket type.
      * @return Submitted ticket type number, or null if input ended or could not be read.
      */
-    public String requestTicketType(SeatCoordinate seat) {
+    public TerminalInput requestTicketType(SeatCoordinate seat) {
         Objects.requireNonNull(seat);
         output.println("Choose a ticket type for seat " + seat + " (1-3):");
-        return readLine();
+        return readInput();
     }
 
     /**
@@ -257,9 +286,9 @@ public final class CustomerUi {
      *
      * @return Submitted menu number, or null if input ended or could not be read.
      */
-    public String requestSnackSelection() {
+    public TerminalInput requestSnackSelection() {
         output.println("Choose an item by number, or enter 0 to finish:");
-        return readLine();
+        return readInput();
     }
 
     /**
@@ -268,11 +297,11 @@ public final class CustomerUi {
      * @param menuItem Menu item whose quantity is requested.
      * @return Submitted quantity, or null if input ended or could not be read.
      */
-    public String requestSnackQuantity(SnackMenuItem menuItem) {
+    public TerminalInput requestSnackQuantity(SnackMenuItem menuItem) {
         Objects.requireNonNull(menuItem);
         output.println("Enter quantity for " + menuItem.getDisplayName()
                 + " (positive whole number):");
-        return readLine();
+        return readInput();
     }
 
     /**
@@ -340,12 +369,12 @@ public final class CustomerUi {
      * @param promotions Promotions available to apply.
      * @return Submitted code, a blank line to skip, or null if input ended or could not be read.
      */
-    public String requestPromoCode(List<PromoCode> promotions) {
+    public TerminalInput requestPromoCode(List<PromoCode> promotions) {
         Objects.requireNonNull(promotions);
         output.println();
         output.println("Enter a promo code (" + formatPromotions(promotions)
                 + "), or press ENTER to skip:");
-        return readLine();
+        return readInput();
     }
 
     /**
@@ -365,112 +394,167 @@ public final class CustomerUi {
      * @param screening Selected screening.
      */
     public void showBill(Bill bill, Movie movie, Screening screening) {
+        writeBill(renderBill(bill, movie, screening));
+    }
+
+    /**
+     * Renders the complete bill without writing to the terminal.
+     *
+     * @param bill Completed customer bill.
+     * @param movie Selected movie.
+     * @param screening Selected screening.
+     * @return Complete bill-summary text.
+     */
+    public String renderBill(Bill bill, Movie movie, Screening screening) {
         Objects.requireNonNull(bill);
         Objects.requireNonNull(movie);
         Objects.requireNonNull(screening);
 
-        showBillHeader();
-        showBillTickets(bill, movie, screening);
-        showBillSnacks(bill);
-        showBillPromotion(bill);
-        showBillTotals(bill);
+        StringBuilder billText = new StringBuilder();
+        appendBillHeader(billText);
+        appendBillTickets(billText, bill, movie, screening);
+        appendBillSnacks(billText, bill);
+        appendBillPromotion(billText, bill);
+        appendBillTotals(billText, bill);
+        return billText.toString();
     }
 
-    private void showBillHeader() {
-        output.println();
-        output.println(BILL_MAJOR_RULE);
-        output.printf(Locale.ROOT, "%" + BILL_TITLE_END_COLUMN + "s%n", BILL_TITLE);
-        output.println(BILL_MAJOR_RULE);
+    /**
+     * Writes a previously rendered bill-summary block.
+     *
+     * @param billText Complete bill-summary text.
+     */
+    public void writeBill(String billText) {
+        output.print(Objects.requireNonNull(billText));
     }
 
-    private void showBillTickets(Bill bill, Movie movie, Screening screening) {
-        output.println();
-        output.println("TICKETS");
-        output.println(BILL_SECTION_RULE);
-        output.println("Movie: " + movie.title());
-        output.println("Time: " + screening.startsAt().format(SCREENING_TIME_FORMATTER));
-        output.println();
-        showBillTableRow("Seat", "Type", "Unit Price");
-        output.println(BILL_SECTION_RULE);
+    /**
+     * Returns whether the shared terminal has accepted all attempted output.
+     *
+     * @return True when no terminal write has failed.
+     */
+    public boolean isOutputAvailable() {
+        return !outputWriter.hasFailed() && !errorWriter.hasFailed();
+    }
+
+    /** Shows an input-failure message before the workflow terminates. */
+    public void showInputFailure() {
+        errorOutput.println("Unable to read input. CineCLI will exit.");
+    }
+
+    /** Shows the post-session role-routing prompt. */
+    public void showPostSessionPrompt() {
+        output.println("Press ENTER to start a new customer session, or enter /admin or /exit:");
+    }
+
+    private void appendBillHeader(StringBuilder billText) {
+        billText.append('\n');
+        appendLine(billText, BILL_MAJOR_RULE);
+        billText.append(String.format(Locale.ROOT, "%" + BILL_TITLE_END_COLUMN + "s%n", BILL_TITLE));
+        appendLine(billText, BILL_MAJOR_RULE);
+    }
+
+    private void appendBillTickets(
+            StringBuilder billText, Bill bill, Movie movie, Screening screening) {
+        billText.append('\n');
+        appendLine(billText, "TICKETS");
+        appendLine(billText, BILL_SECTION_RULE);
+        appendLine(billText, "Movie: " + movie.title());
+        appendLine(billText, "Time: " + screening.startsAt().format(SCREENING_TIME_FORMATTER));
+        billText.append('\n');
+        appendBillTableRow(billText, "Seat", "Type", "Unit Price");
+        appendLine(billText, BILL_SECTION_RULE);
         for (TicketSelection selection : bill.ticketSelections()) {
             TicketType ticketType = selection.ticketType();
-            showBillTableRow(
+            appendBillTableRow(
+                    billText,
                     selection.seat().toString(),
                     ticketType.getDisplayName(),
                     formatPrice(selection.unitPriceInCents()));
         }
-        output.println(BILL_SECTION_RULE);
-        showBillLabelValue(
+        appendLine(billText, BILL_SECTION_RULE);
+        appendBillLabelValue(
+                billText,
                 "Ticket Subtotal:", formatPrice(bill.getTicketSubtotalInCents()));
     }
 
-    private void showBillSnacks(Bill bill) {
-        output.println();
-        output.println("SNACKS AND COMBOS");
-        output.println(BILL_SECTION_RULE);
-        showBillTableRow("Qty", "Item", "Unit Price");
-        output.println(BILL_SECTION_RULE);
+    private void appendBillSnacks(StringBuilder billText, Bill bill) {
+        billText.append('\n');
+        appendLine(billText, "SNACKS AND COMBOS");
+        appendLine(billText, BILL_SECTION_RULE);
+        appendBillTableRow(billText, "Qty", "Item", "Unit Price");
+        appendLine(billText, BILL_SECTION_RULE);
         if (bill.snackSelections().isEmpty()) {
-            output.println("None");
+            appendLine(billText, "None");
         } else {
             for (SnackSelection selection : bill.snackSelections()) {
-                showBillSnackSelection(selection);
+                appendBillSnackSelection(billText, selection);
             }
         }
-        output.println(BILL_SECTION_RULE);
-        showBillLabelValue(
+        appendLine(billText, BILL_SECTION_RULE);
+        appendBillLabelValue(
+                billText,
                 "Snack Subtotal:", formatPrice(bill.getSnackSubtotalInCents()));
     }
 
-    private void showBillPromotion(Bill bill) {
-        output.println();
-        output.println("PROMOTION");
-        output.println(BILL_SECTION_RULE);
+    private void appendBillPromotion(StringBuilder billText, Bill bill) {
+        billText.append('\n');
+        appendLine(billText, "PROMOTION");
+        appendLine(billText, BILL_SECTION_RULE);
         if (bill.promoCode().isPresent()) {
             PromoCode promoCode = bill.promoCode().orElseThrow();
-            showBillLabelValue("Promo Code:", promoCode.code());
-            showBillLabelValue(
+            appendBillLabelValue(billText, "Promo Code:", promoCode.code());
+            appendBillLabelValue(
+                    billText,
                     "Discount:", promoCode.discountPercentage() + "% OFF");
         } else {
-            showBillLabelValue("Promo Code:", "None");
-            showBillLabelValue("Discount:", "0% OFF");
+            appendBillLabelValue(billText, "Promo Code:", "None");
+            appendBillLabelValue(billText, "Discount:", "0% OFF");
         }
-        showBillLabelValue(
+        appendBillLabelValue(
+                billText,
                 "Amount Saved:", "-" + formatPrice(bill.getDiscountInCents()));
     }
 
-    private void showBillTotals(Bill bill) {
-        output.println();
-        output.println(BILL_MAJOR_RULE);
-        showBillLabelValue("Subtotal:", formatPrice(bill.getSubtotalInCents()));
-        showBillLabelValue("Discount:", "-" + formatPrice(bill.getDiscountInCents()));
-        output.println(BILL_SECTION_RULE);
-        showBillLabelValue("TOTAL:", formatPrice(bill.getTotalInCents()));
-        output.println(BILL_MAJOR_RULE);
+    private void appendBillTotals(StringBuilder billText, Bill bill) {
+        billText.append('\n');
+        appendLine(billText, BILL_MAJOR_RULE);
+        appendBillLabelValue(billText, "Subtotal:", formatPrice(bill.getSubtotalInCents()));
+        appendBillLabelValue(billText, "Discount:", "-" + formatPrice(bill.getDiscountInCents()));
+        appendLine(billText, BILL_SECTION_RULE);
+        appendBillLabelValue(billText, "TOTAL:", formatPrice(bill.getTotalInCents()));
+        appendLine(billText, BILL_MAJOR_RULE);
     }
 
-    private void showBillSnackSelection(SnackSelection selection) {
+    private void appendBillSnackSelection(StringBuilder billText, SnackSelection selection) {
         String displayName = selection.menuItem().getDisplayName();
         int descriptionIndex = displayName.indexOf(" (");
         String itemName = descriptionIndex < 0
                 ? displayName
                 : displayName.substring(0, descriptionIndex);
-        showBillTableRow(
+        appendBillTableRow(
+                billText,
                 Integer.toString(selection.quantity()),
                 itemName,
                 formatPrice(selection.unitPriceInCents()));
         if (descriptionIndex >= 0) {
-            output.printf(Locale.ROOT, "%12s%s%n", "", displayName.substring(descriptionIndex + 1));
+            billText.append(String.format(
+                    Locale.ROOT, "%12s%s%n", "", displayName.substring(descriptionIndex + 1)));
         }
     }
 
-    private void showBillTableRow(String firstColumn, String secondColumn, String thirdColumn) {
-        output.printf(
-                Locale.ROOT, "%-12s%-30s%18s%n", firstColumn, secondColumn, thirdColumn);
+    private void appendBillTableRow(
+            StringBuilder billText, String firstColumn, String secondColumn, String thirdColumn) {
+        billText.append(String.format(
+                Locale.ROOT, "%-12s%-30s%18s%n", firstColumn, secondColumn, thirdColumn));
     }
 
-    private void showBillLabelValue(String label, String value) {
-        output.printf(Locale.ROOT, "%-30s%30s%n", label, value);
+    private void appendBillLabelValue(StringBuilder billText, String label, String value) {
+        billText.append(String.format(Locale.ROOT, "%-30s%30s%n", label, value));
+    }
+
+    private void appendLine(StringBuilder billText, String line) {
+        billText.append(line).append('\n');
     }
 
     /**
@@ -618,12 +702,37 @@ public final class CustomerUi {
                 Locale.ROOT, "S$%,d.%02d", priceInCents / 100, priceInCents % 100);
     }
 
-    private String readLine() {
-        try {
-            return input.readLine();
-        } catch (IOException exception) {
-            errorOutput.println("Unable to read input. CineCLI will exit.");
-            return null;
+    private static final class TerminalWriter extends Writer {
+        private final AdminTerminal terminal;
+        private final boolean isError;
+        private boolean hasFailed;
+
+        private TerminalWriter(AdminTerminal terminal, boolean isError) {
+            this.terminal = terminal;
+            this.isError = isError;
+        }
+
+        @Override
+        public void write(char[] characters, int offset, int length) {
+            String text = new String(characters, offset, length);
+            boolean isWritten = isError ? terminal.writeError(text) : terminal.write(text);
+            if (!isWritten) {
+                hasFailed = true;
+            }
+        }
+
+        @Override
+        public void flush() {
+            // AdminTerminal writes and flushes complete supplied text blocks.
+        }
+
+        @Override
+        public void close() {
+            // The application owns the shared terminal lifecycle.
+        }
+
+        private boolean hasFailed() {
+            return hasFailed;
         }
     }
 }

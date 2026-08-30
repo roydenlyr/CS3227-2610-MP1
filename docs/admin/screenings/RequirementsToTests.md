@@ -33,10 +33,10 @@ occupancy, while deletion removes the selected screening's occupancy.
 | Retain data for not-applied or malformed-journal cases and report durable commit status | `commit_notAppliedAndMalformedScreeningJournalPreserveData`; `run_commitFailuresReportBothDurableStatuses` |
 | Keep Movie deletion and recovery behaviour covered after shared-foundation extension | `MovieDeletionTransactionTest`; `MovieManagementRecoveryTest` |
 
-## Deferred acceptance work
+## Integration status and remaining exclusions
 
-- Production role routing must parse raw global commands and make the administrator
-  modules reachable through `Main`.
-- Full end-user administrator instructions remain deferred until that route exists.
+- Production role routing now parses raw global commands and reaches this module
+  through `Main`, `ApplicationRouter`, and `AdministratorApplication`.
+- The User Guide documents the administrator entry point and homepage.
 - Moving a screening between movies, manual ordering, auditorium/clash rules, and
-  booking persistence are outside this workstream.
+  booking persistence remain outside this workstream.

@@ -85,7 +85,6 @@ class MainTest {
 
         assertAll(
                 () -> assertTrue(output.toString().contains("Movie: Crimson Harbor")),
-                () -> assertTrue(output.toString().contains("Seats confirmed: A1")),
                 () -> assertTrue(output.toString().contains(
                         "- A1: Student - S$7.00")),
                 () -> assertTrue(output.toString().contains("Snack and Combo Menu")),

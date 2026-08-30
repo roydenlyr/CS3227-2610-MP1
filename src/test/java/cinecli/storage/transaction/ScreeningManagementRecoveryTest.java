@@ -9,8 +9,10 @@ import cinecli.admin.AdminWorkflowOutcome;
 import cinecli.admin.ScreeningManagementApplication;
 import cinecli.admin.ui.AdminTerminal;
 import cinecli.admin.ui.EndOfInput;
+import cinecli.admin.ui.GlobalCommand;
 import cinecli.admin.ui.SubmittedLine;
 import cinecli.admin.ui.TerminalInput;
+import cinecli.app.ApplicationRouter;
 import cinecli.storage.catalog.CatalogStorage;
 import cinecli.storage.catalog.CatalogTransactionAdapter;
 import cinecli.storage.exception.ScreeningDeletionCommitException;
@@ -32,7 +34,7 @@ class ScreeningManagementRecoveryTest {
     Path tempDirectory;
 
     @Test
-    void run_recoversPendingScreeningDeletionBeforeRendering() throws Exception {
+    void router_recoversPendingScreeningDeletionBeforeCustomerAndAdministratorAccess() throws Exception {
         Paths paths = paths();
         MovieDeletionTransaction interrupted = transaction(paths, (operation, path) -> {
             if (operation == TransactionOperation.VERIFY_CATALOG) {
@@ -41,30 +43,31 @@ class ScreeningManagementRecoveryTest {
         });
         org.junit.jupiter.api.Assertions.assertThrows(ScreeningDeletionCommitException.class,
                 () -> interrupted.commitScreening(interrupted.prepareScreening("SCR-1")));
-        Terminal terminal = new Terminal("0");
+        RouterTerminal terminal = new RouterTerminal(
+                new GlobalCommand(GlobalCommand.Type.ADMIN),
+                new SubmittedLine("2"),
+                new GlobalCommand(GlobalCommand.Type.EXIT));
 
-        assertEquals(AdminWorkflowOutcome.BACK, application(paths, transaction(paths), terminal).run());
+        router(paths, terminal).run();
 
-        assertTrue(terminal.output.toString().startsWith(
-                "Pending catalogue deletion recovery completed.\n"));
+        assertTrue(terminal.output().contains("Welcome to CineCLI"));
+        assertTrue(terminal.output().contains("Administrator Home"));
+        assertTrue(terminal.output().contains("Screening Management"));
         assertFalse(Files.exists(paths.journal()));
         assertFalse(Files.readString(paths.catalog(), UTF_8).contains("SCREENING\tSCR-1\t"));
     }
 
     @Test
-    void run_recoveryOutputFailureTerminates() throws Exception {
+    void router_recoveryFailureDoesNotDispatchWhenErrorOutputFails() throws Exception {
         Paths paths = paths();
-        MovieDeletionTransaction interrupted = transaction(paths, (operation, path) -> {
-            if (operation == TransactionOperation.VERIFY_CATALOG) {
-                throw new IOException("simulated interruption");
-            }
-        });
-        org.junit.jupiter.api.Assertions.assertThrows(ScreeningDeletionCommitException.class,
-                () -> interrupted.commitScreening(interrupted.prepareScreening("SCR-1")));
-        Terminal terminal = new Terminal();
-        terminal.failedWriteNumber = 1;
+        Files.writeString(paths.journal(), "malformed\n", UTF_8);
+        RouterTerminal terminal = new RouterTerminal();
+        terminal.failErrorWrites = true;
 
-        assertEquals(AdminWorkflowOutcome.TERMINATED, application(paths, transaction(paths), terminal).run());
+        router(paths, terminal).run();
+
+        assertTrue(terminal.errors().contains("Unable to recover pending catalogue changes:"));
+        assertEquals("", terminal.output());
     }
 
     @Test
@@ -92,6 +95,15 @@ class ScreeningManagementRecoveryTest {
             Paths paths, MovieDeletionTransaction transaction, Terminal terminal) {
         return new ScreeningManagementApplication(
                 new CatalogStorage(paths.catalog(), DEFAULT_RESOURCE), transaction, terminal);
+    }
+
+    private ApplicationRouter router(Paths paths, RouterTerminal terminal) {
+        return new ApplicationRouter(
+                terminal,
+                paths.catalog(),
+                paths.seats(),
+                paths.catalog().resolveSibling("pricing.tsv"),
+                DEFAULT_RESOURCE);
     }
 
     private MovieDeletionTransaction transaction(Paths paths) {
@@ -166,6 +178,42 @@ class ScreeningManagementRecoveryTest {
         @Override
         public boolean writeError(String text) {
             return true;
+        }
+    }
+
+    private static final class RouterTerminal implements AdminTerminal {
+        private final Deque<TerminalInput> inputs;
+        private final StringBuilder output = new StringBuilder();
+        private final StringBuilder errors = new StringBuilder();
+        private boolean failErrorWrites;
+
+        private RouterTerminal(TerminalInput... inputs) {
+            this.inputs = new ArrayDeque<>(Arrays.asList(inputs));
+        }
+
+        @Override
+        public TerminalInput readLine() {
+            return inputs.isEmpty() ? new EndOfInput() : inputs.removeFirst();
+        }
+
+        @Override
+        public boolean write(String text) {
+            output.append(text);
+            return true;
+        }
+
+        @Override
+        public boolean writeError(String text) {
+            errors.append(text);
+            return !failErrorWrites;
+        }
+
+        private String output() {
+            return output.toString();
+        }
+
+        private String errors() {
+            return errors.toString();
         }
     }
 

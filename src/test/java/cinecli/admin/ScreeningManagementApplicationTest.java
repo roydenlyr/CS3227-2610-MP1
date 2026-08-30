@@ -271,12 +271,6 @@ class ScreeningManagementApplicationTest {
         assertTrue(malformedCatalog.terminal().output().startsWith(
                 "Unable to access screening management: "));
 
-        Fixture malformedJournal = fixture(catalog(), null, lines("0"));
-        Files.writeString(malformedJournal.paths().journal(), "malformed\n", UTF_8);
-        assertEquals(AdminWorkflowOutcome.BACK, malformedJournal.application().run());
-        assertTrue(malformedJournal.terminal().output().startsWith(
-                "Unable to access screening management: "));
-
         Fixture emptyOutputFailure = fixture("CINECLI-CATALOG\t1\n", null, lines("2"));
         emptyOutputFailure.terminal().failWriteNumber(2);
         assertEquals(AdminWorkflowOutcome.TERMINATED, emptyOutputFailure.application().run());

@@ -33,7 +33,7 @@ nondeferred checks pass.
 | `MOV-CAT` | `CatalogStorage.load/save` | `CatalogStorageTest` |
 | `MOV-SEAT` | Read-only and administrative `SeatStorage` snapshot interface | `SeatStorageTest` |
 | `MOV-TX` | `MovieDeletionTransaction.recover/prepare/commit` | `MovieDeletionTransactionTest` |
-| `MOV-ROUTE` | Later shared application loop | Deferred role-routing tests |
+| `MOV-ROUTE` | Shared terminal and application router | `Utf8TerminalTest`, `ApplicationRouterTest`, `CustomerApplicationTest` role-routing matrix |
 
 IDs shown without a prefix in an evidence table inherit the prefix in that
 table's heading.
@@ -46,7 +46,7 @@ partial when the test omits a required partition or assertion.
 
 | Gap | Affected requirements | Necessary evidence before completion |
 | --- | --- | --- |
-| MOV-GAP-001 | MOV-FR-014, MOV-FR-016; UC-MOV-02/03/04 `*` extensions | Exercise each typed global command, EOF, and input failure at every distinct prompt. Current global-command prefixes omit Edit title, Edit rating, and Edit confirmation; EOF/input-failure evidence is entry-only. |
+| MOV-GAP-001 | MOV-FR-014, MOV-FR-016; UC-MOV-02/03/04 `*` extensions | Retained historical workflow-evidence gap: expand direct Movie workflow EOF/input-failure matrices if that feature record is revisited. Shared raw global-command parsing and cross-role routing are implemented separately by the role-routing integration. |
 | MOV-GAP-002 | MOV-FR-003, MOV-FR-004, MOV-FR-007, MOV-FR-008 | Add independent boundary/partition evidence for movie target `count + 1` and overflow; non-tab ISO controls; duplicate and ordinary slash-prefixed titles; and invalid Edit fields while another valid draft change is retained. |
 | MOV-GAP-003 | MOV-FR-001 through MOV-FR-016, MOV-NFR-003 | Replace substring-only checks with independent exact expected output blocks or transcripts for every specified screen, prompt, preview, validation, cancellation, failure, and success path. |
 | MOV-GAP-004 | MOV-FR-012, MOV-FR-016, MOV-NFR-002 | At every injected output failure, assert catalogue, occupancy, journal presence/bytes, and the pre-intent or post-intent durability outcome. The current output-failure matrix asserts only the returned outcome and error text. |
@@ -159,7 +159,7 @@ partial when the test omits a required partition or assertion.
 | MOV-FR-011 | MOV-WF-015, MOV-WF-017, MOV-WF-020, MOV-TX-003 through MOV-TX-009 | Partial - MOV-GAP-003 and MOV-GAP-005 |
 | MOV-FR-012 | MOV-WF-008, MOV-WF-013, MOV-WF-019, MOV-WF-023 | Partial - MOV-GAP-003 and MOV-GAP-004 |
 | MOV-FR-013 | MOV-WF-001, MOV-WF-007, MOV-WF-010, MOV-WF-015, MOV-WF-016, MOV-CAT-001 | Covered by current evidence |
-| MOV-FR-014 | MOV-WF-008, MOV-WF-013, MOV-WF-019, MOV-WF-021, MOV-ROUTE-001 | Partial - MOV-GAP-001; raw routing deferred |
+| MOV-FR-014 | MOV-WF-008, MOV-WF-013, MOV-WF-019, MOV-WF-021, MOV-ROUTE-001 | Partial - MOV-GAP-001; historic workflow evidence gap retained |
 | MOV-FR-015 | MOV-WF-009, MOV-WF-014, MOV-WF-018, MOV-WF-025, MOV-WF-026, MOV-TX-005 through MOV-TX-020 | Partial - MOV-GAP-005 through MOV-GAP-007 |
 | MOV-FR-016 | MOV-WF-022 through MOV-WF-024, MOV-TX-006, MOV-TX-018 | Partial - MOV-GAP-001 and MOV-GAP-004 |
 | MOV-NFR-001 | MOV-CAT-001 through MOV-CAT-004, MOV-SEAT-002 through MOV-SEAT-005, MOV-TX-017 | Partial - MOV-GAP-006 and MOV-GAP-007 |
@@ -182,7 +182,7 @@ partial when the test omits a required partition or assertion.
 | UC-MOV-02 4a: invalid confirmation | MOV-WF-008 | Partial - MOV-GAP-003 |
 | UC-MOV-02 4b: N or `/cancel` | MOV-WF-008 | Covered by current evidence |
 | UC-MOV-02 5a: persistence failure | MOV-WF-009, MOV-CAT-005, MOV-CAT-006 | Covered by current evidence |
-| UC-MOV-02 `*a`: global command or precommit I/O failure | MOV-WF-021 through MOV-WF-023, MOV-ROUTE-001 | Partial - MOV-GAP-001 and MOV-GAP-004; raw routing deferred |
+| UC-MOV-02 `*a`: global command or precommit I/O failure | MOV-WF-021 through MOV-WF-023, MOV-ROUTE-001 | Partial - MOV-GAP-001 and MOV-GAP-004; historic workflow evidence gap retained |
 | UC-MOV-03 1a: empty catalogue | MOV-WF-002 | Covered by current evidence |
 | UC-MOV-03 1b: invalid selection | MOV-WF-004 | Partial - MOV-GAP-002 |
 | UC-MOV-03 2a: invalid field | MOV-WF-005, MOV-WF-006 | Partial - MOV-GAP-002 |
@@ -191,7 +191,7 @@ partial when the test omits a required partition or assertion.
 | UC-MOV-03 4a: N or `/cancel` | MOV-WF-013 | Covered by current evidence |
 | UC-MOV-03 5a: persistence failure | MOV-WF-014, MOV-CAT-005, MOV-CAT-006 | Covered by current evidence |
 | UC-MOV-03 `*a`: `0` cancellation | MOV-WF-004, MOV-WF-013 | Covered by current evidence |
-| UC-MOV-03 `*b`: global command or precommit I/O failure | MOV-WF-021 through MOV-WF-023, MOV-ROUTE-001 | Partial - MOV-GAP-001 and MOV-GAP-004; raw routing deferred |
+| UC-MOV-03 `*b`: global command or precommit I/O failure | MOV-WF-021 through MOV-WF-023, MOV-ROUTE-001 | Partial - MOV-GAP-001 and MOV-GAP-004; historic workflow evidence gap retained |
 | UC-MOV-04 1a: empty catalogue | MOV-WF-002 | Covered by current evidence |
 | UC-MOV-04 1b: invalid selection | MOV-WF-004 | Partial - MOV-GAP-002 |
 | UC-MOV-04 2a: childless movie | MOV-WF-015, MOV-TX-001, MOV-TX-008 | Covered by current evidence |
@@ -201,20 +201,21 @@ partial when the test omits a required partition or assertion.
 | UC-MOV-04 4a: failure before durable intent | MOV-TX-005, MOV-WF-015 | Partial - MOV-GAP-005 |
 | UC-MOV-04 4b: failure after durable intent | MOV-TX-006, MOV-TX-018 | Partial - MOV-GAP-005 |
 | UC-MOV-04 5a: deleted movie was last | MOV-WF-015, MOV-CAT-002 | Covered by current evidence |
-| UC-MOV-04 `*a`: global command or precommit I/O failure | MOV-WF-021 through MOV-WF-023, MOV-ROUTE-001 | Partial - MOV-GAP-001 and MOV-GAP-004; raw routing deferred |
+| UC-MOV-04 `*a`: global command or precommit I/O failure | MOV-WF-021 through MOV-WF-023, MOV-ROUTE-001 | Partial - MOV-GAP-001 and MOV-GAP-004; historic workflow evidence gap retained |
 
 ## Deferred role-routing obligations
 
 | ID | Required later evidence | Status |
 | --- | --- | --- |
-| MOV-ROUTE-001 | Production raw parsing of trimmed mixed-case `/admin`, `/customer`, and `/exit` into Movie's typed transitions at every prompt. | Deferred - role routing |
-| MOV-ROUTE-002 | Route both customer and administrator access through the shared `CatalogRecoveryGate` before affected catalogue or occupancy data is used. | Gate implemented; shared routing deferred |
+| MOV-ROUTE-001 | Production raw parsing of trimmed mixed-case `/admin`, `/customer`, and `/exit` into Movie's typed transitions at every prompt. | Implemented: `Utf8Terminal` parses once; `ApplicationRouterTest` and role-routing regression tests exercise typed handoffs. |
+| MOV-ROUTE-002 | Route both customer and administrator access through the shared `CatalogRecoveryGate` before affected catalogue or occupancy data is used. | Implemented: `ApplicationRouter` invokes the one gate before each role dispatch. |
 
-Movie management has evidence for each typed handoff value and for recovery
-behaviour at its public seam, but MOV-GAP-001 still requires those handoffs at
-every distinct prompt. The production parser and cross-role use of the recovery
-gate remain mandatory acceptance items for the later role-routing workstream and
-are not claimed as implemented here.
+Movie management has evidence for each typed handoff value and recovery behaviour
+at its public seam. The production parser and cross-role recovery-gate use are
+now implemented by the integration layer. MOV-GAP-001 and MOV-GAP-002 through
+MOV-GAP-008 retain their historical checklist status unless their named
+workflow-specific evidence is added; this integration does not silently close
+those inherited gaps.
 
 ## Completion gate
 

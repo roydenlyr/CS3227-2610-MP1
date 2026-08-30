@@ -4,8 +4,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import cinecli.admin.ui.AdminTerminal;
+import cinecli.admin.ui.EndOfInput;
+import cinecli.admin.ui.InputFailure;
+import cinecli.admin.ui.SubmittedLine;
+import cinecli.admin.ui.TerminalInput;
 import cinecli.customer.ui.CustomerUi;
 import cinecli.storage.catalog.CatalogStorage;
 import cinecli.storage.pricing.PricingStorage;
@@ -14,10 +20,15 @@ import cinecli.storage.seat.SeatStorageTestSupport;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -230,7 +241,7 @@ class CustomerApplicationTest {
         StringWriter normalOutput = new StringWriter();
         StringWriter errorOutput = new StringWriter();
         CustomerUi customerUi = new CustomerUi(
-                new StringReader("\n1A\nA1\nY\n"), normalOutput, errorOutput);
+                new StringReader("\n1A\nA1\nY\n1\n0\n\n"), normalOutput, errorOutput);
 
         new CustomerApplication(
                 customerUi,
@@ -241,8 +252,9 @@ class CustomerApplicationTest {
         assertAll(
                 () -> assertTrue(errorOutput.toString().contains(
                         "Unable to load or update seat availability")),
-                () -> assertFalse(normalOutput.toString().contains("Ticket Types")),
-                () -> assertEquals("CINECLI-SEATS\t1\n", Files.readString(runtimeSeats, UTF_8)));
+                () -> assertTrue(normalOutput.toString().contains("Ticket Types")),
+                () -> assertFalse(normalOutput.toString().contains("BILL SUMMARY")),
+                () -> assertFalse(Files.exists(runtimeSeats)));
     }
 
     @Test
@@ -285,7 +297,6 @@ class CustomerApplicationTest {
         List<String> rowGStates = applicationOutput.normalOutput().lines()
                 .filter(line -> line.startsWith("G   "))
                 .toList();
-        int seatsConfirmedIndex = normalOutput.indexOf("Seats confirmed: G4, G5");
         int ticketMenuIndex = normalOutput.indexOf("Ticket Types");
         int ticketSelectionsIndex = normalOutput.indexOf("Selected Tickets");
         int snackMenuIndex = normalOutput.indexOf("Snack and Combo Menu");
@@ -302,8 +313,7 @@ class CustomerApplicationTest {
                 () -> assertTrue(normalOutput.contains("SCREEN")),
                 () -> assertTrue(normalOutput.contains(
                         "Confirm seats G4, G5? (Y/N):")),
-                () -> assertTrue(seatsConfirmedIndex >= 0),
-                () -> assertTrue(ticketMenuIndex > seatsConfirmedIndex),
+                () -> assertTrue(ticketMenuIndex >= 0),
                 () -> assertTrue(ticketSelectionsIndex > ticketMenuIndex),
                 () -> assertTrue(snackMenuIndex > ticketSelectionsIndex),
                 () -> assertTrue(normalOutput.contains(
@@ -517,7 +527,6 @@ class CustomerApplicationTest {
         assertAll(
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "seat G4 is already taken")),
-                () -> assertTrue(applicationOutput.normalOutput().contains("Seats confirmed: G5")),
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "- G5: Senior - S$4.50")),
                 () -> assertTrue(hasBillLine(
@@ -554,9 +563,7 @@ class CustomerApplicationTest {
                         "Enter a promo code")),
                 () -> assertFalse(applicationOutput.normalOutput().contains(
                         "BILL SUMMARY")),
-                () -> assertEquals(
-                        "CINECLI-SEATS\t1\n",
-                        Files.readString(applicationOutput.runtimeSeats(), UTF_8)),
+                () -> assertFalse(Files.exists(applicationOutput.runtimeSeats())),
                 () -> assertEquals("", applicationOutput.errorOutput()));
     }
 
@@ -596,7 +603,6 @@ class CustomerApplicationTest {
                         "seat A1 was entered more than once")),
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "enter Y to confirm or N to choose again")),
-                () -> assertTrue(applicationOutput.normalOutput().contains("Seats confirmed: A1")),
                 () -> assertTrue(applicationOutput.normalOutput().contains(
                         "- A1: Adult - S$11.00")),
                 () -> assertEquals("", applicationOutput.errorOutput()));
@@ -668,6 +674,227 @@ class CustomerApplicationTest {
                 () -> assertEquals("", applicationOutput.errorOutput()));
     }
 
+    @Test
+    void run_globalCommandsAtEveryDeferredPrompt_discardTentativeSeats() throws IOException {
+        List<String> prefixes = List.of(
+                "\n/admin\n",
+                "\n1A\n/admin\n",
+                "\n1A\nA1\n/admin\n",
+                "\n1A\nA1\nY\n/admin\n",
+                "\n1A\nA1\nY\n1\n/admin\n",
+                "\n1A\nA1\nY\n1\n1\n/admin\n",
+                "\n1A\nA1\nY\n1\n0\n/admin\n");
+
+        for (String input : prefixes) {
+            Path runtimeSeats = tempDirectory.resolve("deferred-" + prefixes.indexOf(input) + ".tsv");
+
+            CustomerWorkflowOutcome outcome = runWithTerminal(
+                    new CustomerUi(new StringReader(input), new StringWriter(), new StringWriter()), runtimeSeats);
+
+            assertAll(
+                    () -> assertEquals(CustomerWorkflowOutcome.ADMIN, outcome),
+                    () -> assertFalse(Files.exists(runtimeSeats)));
+        }
+    }
+
+    @Test
+    void run_customerAndExitCommands_returnTheirTypedOutcomes() throws IOException {
+        Path customerSeats = tempDirectory.resolve("customer-command.tsv");
+        Path exitSeats = tempDirectory.resolve("exit-command.tsv");
+
+        assertAll(
+                () -> assertEquals(
+                        CustomerWorkflowOutcome.CUSTOMER,
+                        runWithTerminal(
+                                new CustomerUi(
+                                        new StringReader("\n/customer\n"),
+                                        new StringWriter(),
+                                        new StringWriter()),
+                                customerSeats)),
+                () -> assertFalse(Files.exists(customerSeats)),
+                () -> assertEquals(
+                        CustomerWorkflowOutcome.EXIT,
+                        runWithTerminal(
+                                new CustomerUi(
+                                        new StringReader("\n/exit\n"),
+                                        new StringWriter(),
+                                        new StringWriter()),
+                                exitSeats)),
+                () -> assertFalse(Files.exists(exitSeats)));
+    }
+
+    @Test
+    void run_localCancellationAtEveryDeferredPrompt_discardsTentativeSeats() throws IOException {
+        List<String> inputs = List.of(
+                "\nCANCEL\n",
+                "\n1A\nA1\n/cancel\n",
+                "\n1A\nA1\nY\n/cancel\n",
+                "\n1A\nA1\nY\n1\n/cancel\n",
+                "\n1A\nA1\nY\n1\n1\n/cancel\n",
+                "\n1A\nA1\nY\n1\n0\n/cancel\n");
+
+        for (String input : inputs) {
+            Path runtimeSeats = tempDirectory.resolve("cancel-" + inputs.indexOf(input) + ".tsv");
+
+            CustomerWorkflowOutcome outcome = runWithTerminal(
+                    new CustomerUi(new StringReader(input), new StringWriter(), new StringWriter()), runtimeSeats);
+
+            assertAll(
+                    () -> assertEquals(CustomerWorkflowOutcome.CUSTOMER, outcome),
+                    () -> assertFalse(Files.exists(runtimeSeats)));
+        }
+    }
+
+    @Test
+    void run_finalConflictSuppressesFirstBillAndReturnsToFreshSeatSelection() throws IOException {
+        Path runtimeSeats = tempDirectory.resolve("conflict.tsv");
+        ScriptedTerminal terminal = ScriptedTerminal.fromLines(
+                List.of("", "1A", "A1", "Y", "1", "0", "", "B1", "Y", "1", "0", ""),
+                text -> true,
+                () -> Files.writeString(
+                        runtimeSeats,
+                        "CINECLI-SEATS\t1\nTAKEN_SEAT\tSCR-001\tA1\n",
+                        UTF_8));
+
+        CustomerWorkflowOutcome outcome = runWithTerminal(new CustomerUi(terminal), runtimeSeats);
+
+        assertAll(
+                () -> assertEquals(CustomerWorkflowOutcome.TERMINATED, outcome),
+                () -> assertEquals(1, terminal.output().split("BILL SUMMARY", -1).length - 1),
+                () -> assertTrue(terminal.output().contains(
+                        "selected seats are no longer available; choose again")),
+                () -> assertEquals(
+                        "CINECLI-SEATS\t1\n"
+                                + "TAKEN_SEAT\tSCR-001\tA1\n"
+                                + "TAKEN_SEAT\tSCR-001\tB1\n",
+                        Files.readString(runtimeSeats, UTF_8)));
+    }
+
+    @Test
+    void run_finalConflictOutputFailure_terminatesWithoutBill() throws IOException {
+        Path runtimeSeats = tempDirectory.resolve("conflict-output.tsv");
+        ScriptedTerminal terminal = ScriptedTerminal.fromLines(
+                List.of("", "1A", "A1", "Y", "1", "0", ""),
+                text -> !text.contains("selected seats are no longer available"),
+                () -> Files.writeString(
+                        runtimeSeats,
+                        "CINECLI-SEATS\t1\nTAKEN_SEAT\tSCR-001\tA1\n",
+                        UTF_8));
+
+        CustomerWorkflowOutcome outcome = runWithTerminal(new CustomerUi(terminal), runtimeSeats);
+
+        assertAll(
+                () -> assertEquals(CustomerWorkflowOutcome.TERMINATED, outcome),
+                () -> assertFalse(terminal.output().contains("BILL SUMMARY")),
+                () -> assertEquals(
+                        "CINECLI-SEATS\t1\nTAKEN_SEAT\tSCR-001\tA1\n",
+                        Files.readString(runtimeSeats, UTF_8)));
+    }
+
+    @Test
+    void run_outputFailuresAtDeferredStages_preserveUnfinalizedState() throws IOException {
+        List<OutputFailureCase> cases = List.of(
+                new OutputFailureCase("Seat Selection", "\n1A\n"),
+                new OutputFailureCase("Selected Tickets", "\n1A\nA1\nY\n1\n"),
+                new OutputFailureCase("No snacks or combos selected.", "\n1A\nA1\nY\n1\n0\n"));
+
+        for (OutputFailureCase failureCase : cases) {
+            Path runtimeSeats = tempDirectory.resolve("output-"
+                    + cases.indexOf(failureCase) + ".tsv");
+            ScriptedTerminal terminal = new ScriptedTerminal(
+                    lines(failureCase.input()), text -> !text.contains(failureCase.failingText()), () -> { });
+
+            CustomerWorkflowOutcome outcome = runWithTerminal(new CustomerUi(terminal), runtimeSeats);
+
+            assertAll(
+                    () -> assertEquals(CustomerWorkflowOutcome.TERMINATED, outcome),
+                    () -> assertFalse(Files.exists(runtimeSeats)));
+        }
+    }
+
+    @Test
+    void run_billOutputFailureRetainsDurablyConfirmedSeats() throws IOException {
+        Path runtimeSeats = tempDirectory.resolve("bill-output.tsv");
+        ScriptedTerminal terminal = new ScriptedTerminal(
+                lines("\n1A\nA1\nY\n1\n0\n\n"),
+                text -> !text.contains("BILL SUMMARY"), () -> { });
+
+        CustomerWorkflowOutcome outcome = runWithTerminal(new CustomerUi(terminal), runtimeSeats);
+
+        assertAll(
+                () -> assertEquals(CustomerWorkflowOutcome.TERMINATED, outcome),
+                () -> assertFalse(terminal.output().contains("BILL SUMMARY")),
+                () -> assertTrue(Files.exists(runtimeSeats)),
+                () -> assertTrue(Files.readString(runtimeSeats, UTF_8).contains("TAKEN_SEAT\tSCR-001\tA1")));
+    }
+
+    @Test
+    void run_successfulPurchaseWithBlankPostSessionInput_returnsCustomer() throws IOException {
+        Path runtimeSeats = tempDirectory.resolve("post-session.tsv");
+
+        CustomerWorkflowOutcome outcome = runWithTerminal(
+                new CustomerUi(
+                        new StringReader("\n1A\nA1\nY\n1\n0\n\n\n"),
+                        new StringWriter(),
+                        new StringWriter()),
+                runtimeSeats);
+
+        assertAll(
+                () -> assertEquals(CustomerWorkflowOutcome.CUSTOMER, outcome),
+                () -> assertTrue(Files.exists(runtimeSeats)));
+    }
+
+    @Test
+    void run_inputAndInitialOutputFailures_terminateSafely() throws IOException {
+        Path inputFailureSeats = tempDirectory.resolve("input-failure.tsv");
+        ScriptedTerminal inputFailureTerminal = new ScriptedTerminal(
+                List.<TerminalInput>of(new InputFailure()), text -> true, () -> { });
+        Path outputFailureSeats = tempDirectory.resolve("initial-output-failure.tsv");
+        ScriptedTerminal outputFailureTerminal = new ScriptedTerminal(
+                List.<TerminalInput>of(new SubmittedLine("")), text -> false, () -> { });
+
+        assertAll(
+                () -> assertEquals(
+                        CustomerWorkflowOutcome.TERMINATED,
+                        runWithTerminal(new CustomerUi(inputFailureTerminal), inputFailureSeats)),
+                () -> assertTrue(inputFailureTerminal.errorOutput().contains("Unable to read input")),
+                () -> assertFalse(Files.exists(inputFailureSeats)),
+                () -> assertEquals(
+                        CustomerWorkflowOutcome.TERMINATED,
+                        runWithTerminal(new CustomerUi(outputFailureTerminal), outputFailureSeats)),
+                () -> assertFalse(Files.exists(outputFailureSeats)));
+    }
+
+    @Test
+    void run_catalogOutputFailure_terminatesBeforeScreeningSelection() throws IOException {
+        Path runtimeSeats = tempDirectory.resolve("catalog-output-failure.tsv");
+        ScriptedTerminal terminal = new ScriptedTerminal(
+                lines("\n"), text -> !text.contains("Movie Catalog"), () -> { });
+
+        CustomerWorkflowOutcome outcome = runWithTerminal(new CustomerUi(terminal), runtimeSeats);
+
+        assertAll(
+                () -> assertEquals(CustomerWorkflowOutcome.TERMINATED, outcome),
+                () -> assertFalse(Files.exists(runtimeSeats)),
+                () -> assertFalse(terminal.output().contains("Screening Selection")));
+    }
+
+    @Test
+    void read_unexpectedTerminalResult_throwsIllegalStateException() throws Exception {
+        CustomerApplication application = new CustomerApplication(
+                new CustomerUi(new StringReader(""), new StringWriter(), new StringWriter()),
+                new CatalogStorage(tempDirectory.resolve("unexpected-catalog.tsv"), DEFAULT_RESOURCE),
+                new SeatStorage(tempDirectory.resolve("unexpected-seats.tsv")),
+                new PricingStorage(tempDirectory.resolve("unexpected-pricing.tsv")));
+        Method read = CustomerApplication.class.getDeclaredMethod("read", TerminalInput.class);
+        read.setAccessible(true);
+
+        InvocationTargetException exception = assertThrows(
+                InvocationTargetException.class, () -> read.invoke(application, new Object[] {null}));
+
+        assertTrue(exception.getCause() instanceof IllegalStateException);
+    }
+
     private ApplicationOutput runWithCatalog(String catalog) throws IOException {
         return runWithData(catalog, null, "\n");
     }
@@ -708,5 +935,92 @@ class CustomerApplicationTest {
 
     private record ApplicationOutput(
             String normalOutput, String errorOutput, Path runtimeSeats) {
+    }
+
+    private CustomerWorkflowOutcome runWithTerminal(CustomerUi customerUi, Path runtimeSeats)
+            throws IOException {
+        Path runtimeCatalog = runtimeSeats.resolveSibling(runtimeSeats.getFileName() + ".catalog.tsv");
+        Files.writeString(runtimeCatalog, singleScreeningCatalog(), UTF_8);
+        return new CustomerApplication(
+                customerUi,
+                new CatalogStorage(runtimeCatalog, DEFAULT_RESOURCE),
+                new SeatStorage(runtimeSeats),
+                new PricingStorage(runtimeSeats.resolveSibling(runtimeSeats.getFileName() + ".pricing.tsv")))
+                .run();
+    }
+
+    private List<TerminalInput> lines(String input) {
+        return input.lines().map(SubmittedLine::new).map(TerminalInput.class::cast).toList();
+    }
+
+    private record OutputFailureCase(String failingText, String input) {
+    }
+
+    @FunctionalInterface
+    private interface CheckedAction {
+        void run() throws IOException;
+    }
+
+    private static final class ScriptedTerminal implements AdminTerminal {
+        private final Deque<TerminalInput> inputs;
+        private final Predicate<String> isWritable;
+        private final CheckedAction beforeSeventhInput;
+        private final StringBuilder output = new StringBuilder();
+        private final StringBuilder errorOutput = new StringBuilder();
+        private int inputCount;
+
+        private ScriptedTerminal(
+                List<TerminalInput> inputs, Predicate<String> isWritable, CheckedAction beforeSeventhInput) {
+            this.inputs = new ArrayDeque<>(inputs);
+            this.isWritable = isWritable;
+            this.beforeSeventhInput = beforeSeventhInput;
+        }
+
+        private static ScriptedTerminal fromLines(
+                List<String> inputs, Predicate<String> isWritable, CheckedAction beforeSeventhInput) {
+            return new ScriptedTerminal(
+                    inputs.stream().map(SubmittedLine::new).map(TerminalInput.class::cast).toList(),
+                    isWritable,
+                    beforeSeventhInput);
+        }
+
+        @Override
+        public TerminalInput readLine() {
+            inputCount++;
+            if (inputCount == 7) {
+                try {
+                    beforeSeventhInput.run();
+                } catch (IOException exception) {
+                    throw new AssertionError(exception);
+                }
+            }
+            return inputs.isEmpty() ? new EndOfInput() : inputs.removeFirst();
+        }
+
+        @Override
+        public boolean write(String text) {
+            if (!isWritable.test(text)) {
+                return false;
+            }
+            output.append(text);
+            return true;
+        }
+
+        @Override
+        public boolean writeError(String text) {
+            if (!isWritable.test(text)) {
+                return false;
+            }
+            errorOutput.append(text);
+            return true;
+        }
+
+        private String output() {
+            return output.toString();
+        }
+
+        private String errorOutput() {
+            return errorOutput.toString();
+        }
     }
 }

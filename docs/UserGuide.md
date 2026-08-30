@@ -11,8 +11,10 @@ times.
 Seat occupancy is stored temporarily until booking records become the source of
 truth. Global ticket, snack/combo, and promotion pricing is stored separately in
 runtime data. Ticket assignments, snack and combo choices, applied promo codes,
-and bills remain session-only price snapshots. Administration, payment, and
-complete booking records are not part of this milestone.
+and bills remain session-only price snapshots. CineCLI also provides an
+unauthenticated administrator interface for movie, screening, and pricing/
+promotion management. Payment and complete booking records are not part of this
+milestone.
 
 ## Prerequisite
 
@@ -83,17 +85,18 @@ available.`
 3. `O` represents an available seat. `X` represents either a previously confirmed
    seat or a tentative selection in the current session.
 4. Enter one or more coordinates separated by spaces, such as `G4 G5`.
-5. Review the updated map and enter `Y` to confirm. Enter `N` to clear the
-   tentative selection and choose again. Enter `CANCEL` at the coordinate prompt
-   to leave without confirming seats.
+5. Review the updated map and enter `Y` to keep the selection tentative while
+   you choose ticket types, snacks, and an optional promotion. Enter `N` to
+   clear the tentative selection and choose again. Enter `CANCEL` at the
+   coordinate prompt to leave without confirming seats.
 
-Confirmed selections remain `X` on later runs. CineCLI rejects malformed,
+The selected seats are not written at this point. CineCLI rejects malformed,
 duplicate, or already-taken coordinates and asks for another selection.
 
 ## Choose a ticket type
 
-After seats are confirmed, CineCLI displays the fixed ticket identities with the
-prices loaded for the current session. A new runtime data directory receives the
+After the tentative seats are selected, CineCLI displays the fixed ticket
+identities with the prices loaded for the current session. A new runtime data directory receives the
 following seeded prices:
 
 ```text
@@ -103,7 +106,7 @@ Ticket Types
 3. Student - S$7.00
 ```
 
-CineCLI requests one ticket type for each confirmed seat, in coordinate order. For
+CineCLI requests one ticket type for each tentatively selected seat, in coordinate order. For
 example, seats `G4 G5` are prompted as `G4` followed by `G5`, even if they were
 entered in a different order. Enter `1`, `2`, or `3` at each prompt. Invalid,
 blank, or unavailable numbers are rejected, and CineCLI asks again for the same
@@ -111,7 +114,7 @@ seat before moving on.
 
 ## Choose a snack or combo
 
-After every confirmed seat has a ticket type, CineCLI displays the fixed
+After every tentatively selected seat has a ticket type, CineCLI displays the fixed
 snack/combo identities with the prices loaded for the current session. A new
 runtime data directory receives the following seeded prices:
 
@@ -157,7 +160,10 @@ ENTER on a blank line to skip the promotion. A nonblank unsupported code is
 rejected and the same prompt is shown again. Only one code can be applied; promo
 codes cannot be stacked.
 
-CineCLI then displays a four-section bill. The ticket section identifies the movie
+CineCLI constructs the complete four-section bill in memory, atomically confirms
+the selected seats, and then displays the bill. If the final confirmation detects
+that a seat was taken in the meantime, no bill is displayed and CineCLI returns
+to seat selection. If final persistence fails, no bill is displayed. The ticket section identifies the movie
 and screening time before listing each seat, demographic ticket type, and unit
 price. The snack section lists each distinct selection, its quantity, and its unit
 price. Combo contents wrap onto an indented second line. The promotion section
@@ -220,10 +226,11 @@ On first launch from a working directory without `data/runtime/catalog.tsv`,
 CineCLI creates that file from fictional defaults bundled in the JAR. Later
 launches use the existing runtime file without replacing it.
 
-When seat selection is first opened, a missing `data/runtime/seats.tsv` is created
-as an empty, versioned seat occupancy file. Confirmed selections are stored by
-screening ID and seat coordinate. This file is temporary and will be replaced by
-booking-owned seat allocations when booking persistence is implemented.
+Browsing a screening treats a missing `data/runtime/seats.tsv` as empty and does
+not create it. The file is created only by the first successful final seat
+confirmation. Confirmed selections are stored by screening ID and seat coordinate.
+This file is temporary and will be replaced by booking-owned seat allocations
+when booking persistence is implemented.
 
 After the welcome screen and before CineCLI displays the catalog, a missing
 `data/runtime/pricing.tsv` is atomically seeded with the current default ticket,
@@ -245,3 +252,47 @@ state is accessed, so it cannot initialize or alter `seats.tsv`. Restore valid
 data, or remove a malformed catalog if the bundled catalog defaults should be
 recreated on the next launch. See `data/README.md` for the supported
 `pricing.tsv` format.
+
+## Switch roles or exit
+
+At every customer or administrator prompt, you may enter `/admin`, `/customer`,
+or `/exit`. Commands ignore surrounding whitespace and letter case. `/admin`
+discards any unfinished customer purchase and opens the administrator home.
+`/customer` opens a fresh customer session; `/exit` ends CineCLI. Local
+`/cancel` and Back/`0` choices only abandon the current uncommitted workflow.
+
+## Administrator home
+
+Enter `/admin` from any prompt. The administrator home provides:
+
+```text
+Administrator Home
+1. Movie Management
+2. Screening Management
+3. Pricing and Promotions Management
+0. Return to customer mode
+```
+
+Choose `0` or enter `/customer` to return to the kiosk. The same global commands
+remain available within every management workflow.
+
+### Manage movies and screenings
+
+Movie Management lists movies in persisted order and provides List, Add, Edit,
+and Delete actions. Screening Management lists screenings with their parent movie
+and provides the corresponding actions. Follow the displayed numbered prompts.
+Each change is previewed and requires `Y` confirmation; `N` or `/cancel` leaves
+the persisted data unchanged. Deleting a movie removes its child screenings and
+their temporary occupied-seat records. Deleting a screening removes only that
+screening's temporary occupied-seat records; editing its date or time retains
+them.
+
+### Manage pricing and promotions
+
+Pricing and Promotions Management leads to ticket-price, snack/combo-price, and
+promotion workflows. Ticket and snack/combo identities are fixed; only their
+prices may change. Prices must be between `S$0.01` and `S$9,999.99` with two
+decimal places. Promotions can be listed, added, edited, or deleted; percentages
+must be whole numbers from `1` through `100`. Every change is previewed and
+requires `Y` confirmation. A failed save is reported and does not replace the
+existing `pricing.tsv`.

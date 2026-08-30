@@ -2,11 +2,6 @@ package cinecli.app;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import cinecli.customer.CustomerApplication;
-import cinecli.customer.ui.CustomerUi;
-import cinecli.storage.catalog.CatalogStorage;
-import cinecli.storage.pricing.PricingStorage;
-import cinecli.storage.seat.SeatStorage;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
@@ -39,7 +34,7 @@ public final class Main {
     }
 
     /**
-     * Runs the customer workflow using a catalog path and a sibling seat occupancy path.
+     * Runs the application using a catalogue path and sibling runtime data paths.
      *
      * @param input User input source.
      * @param output Normal user output destination.
@@ -57,7 +52,7 @@ public final class Main {
     }
 
     /**
-     * Runs the customer workflow using the supplied inputs, outputs, and runtime data paths.
+     * Runs the application using the supplied inputs, outputs, and runtime data paths.
      *
      * @param input User input source.
      * @param output Normal user output destination.
@@ -81,7 +76,7 @@ public final class Main {
     }
 
     /**
-     * Runs the customer workflow using the supplied inputs, outputs, and runtime data paths.
+     * Runs the application using the supplied inputs, outputs, and runtime data paths.
      *
      * @param input User input source.
      * @param output Normal user output destination.
@@ -97,13 +92,13 @@ public final class Main {
             Path runtimeCatalogPath,
             Path runtimeSeatsPath,
             Path runtimePricingPath) {
-        CustomerUi customerUi = new CustomerUi(input, output, errorOutput);
-        CatalogStorage catalogStorage = new CatalogStorage(
-                runtimeCatalogPath, DEFAULT_CATALOG_RESOURCE);
-        SeatStorage seatStorage = new SeatStorage(runtimeSeatsPath);
-        PricingStorage pricingStorage = new PricingStorage(runtimePricingPath);
-        CustomerApplication customerApplication = new CustomerApplication(
-                customerUi, catalogStorage, seatStorage, pricingStorage);
-        customerApplication.run();
+        Utf8Terminal terminal = new Utf8Terminal(input, output, errorOutput);
+        ApplicationRouter router = new ApplicationRouter(
+                terminal,
+                runtimeCatalogPath,
+                runtimeSeatsPath,
+                runtimePricingPath,
+                DEFAULT_CATALOG_RESOURCE);
+        router.run();
     }
 }

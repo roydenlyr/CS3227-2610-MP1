@@ -117,18 +117,22 @@ that seat is available.
   invalid.
 - Records are written deterministically by screening ID, row, and seat number.
 
-When the seat file is missing, CineCLI creates a header-only file. Existing data
-is fully validated before use. A malformed file is preserved and rejected rather
-than replaced with an empty layout. Confirmed changes are written through a
-same-directory temporary file and require atomic target replacement. If the file
+When the seat file is missing, browsing treats it as empty and leaves it missing.
+Only a successful final customer confirmation creates the header and first
+occupancy record. Existing data is fully validated before use. A malformed file
+is preserved and rejected rather than replaced with an empty layout. Confirmed
+changes are written through a same-directory temporary file and require atomic
+target replacement. If final persistence fails for a missing target, the target
+remains missing; it must not leave an unintended new `seats.tsv`. If the file
 system does not support atomic replacement, the update fails and existing data is
 preserved. The approved runtime assumption is one CineCLI process, so
 inter-process locking is not provided.
 
 The terminal's `O` and `X` characters are derived from this data and are not stored
 as a rendered grid. During interaction, `X` also represents seats tentatively
-selected in the current session; tentative choices are persisted only after the
-user confirms them.
+selected in the current session. Tentative choices remain in memory while ticket,
+snack, and promotion choices are made; they are persisted only after the complete
+bill text has been generated successfully.
 
 Rescheduling a screening retains every `TAKEN_SEAT` record because the screening
 ID is unchanged. Deleting a screening removes only its records; deleting a movie
@@ -141,14 +145,15 @@ causes that deletion to fail.
 ## Catalogue deletion recovery journal
 
 Movie and Screening deletion share one durable journal at
-`data/runtime/catalog-transaction.journal` when later administrator routing uses
-the standard runtime paths. It is an implementation-owned UTF-8 version-1 file,
+`data/runtime/catalog-transaction.journal` under the standard runtime paths. It
+is an implementation-owned UTF-8 version-1 file,
 not a hand-edited data format. It captures original and intended catalogue and
 occupancy snapshots, and its operation is either `DELETE_MOVIE` or
 `DELETE_SCREENING`.
 
 The journal is atomically published before a deletion that coordinates catalogue
-and occupancy state. On the next administrator access, recovery verifies the
+and occupancy state. Before either customer or administrator access to affected
+catalogue or occupancy data, recovery verifies the
 operation and snapshots, completes the intended state idempotently, and removes
 the journal. A malformed journal or state that diverges from both recorded
 snapshots blocks access and is retained for investigation; it is never replaced

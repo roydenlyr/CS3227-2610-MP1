@@ -44,6 +44,20 @@ The written Java indentation rule controls: 4 spaces for block indentation and
 an additional 8 spaces for continuation indentation. Java source must not use
 tabs.
 
+## Integration status
+
+Integration status: Role routing and deferred confirmation are implemented on
+`codex/admin-role-routing` and were clean-verified in an isolated temporary
+build on 30 August 2026. `Main` is a thin bootstrap; `ApplicationRouter` owns the
+role loop, shared dependency graph, and the one `CatalogRecoveryGate` invocation
+before each role receives affected data access. `AdministratorApplication` owns
+only its three-option homepage and delegation to the existing Movie, Screening,
+and Pricing/Promotions applications.
+
+The original Movie checklist gaps `MOV-GAP-002` through `MOV-GAP-008` are
+inherited gaps. This integration neither redesigns Movie Management internals nor
+claims those items complete.
+
 ## Implementation checkpoint
 
 Checkpoint date: 27 August 2026.
@@ -142,18 +156,20 @@ versions pinned.
 
 The administrator homepage contains these sections:
 
-1. Movies
-2. Screenings
-3. Ticket Prices
-4. Snack/Combo Prices
-5. Promotions
+1. Movie Management
+2. Screening Management
+3. Pricing and Promotions Management
+
+`0. Return to customer mode` returns to the customer role. The Pricing and
+Promotions section delegates to the existing focused ticket-price,
+snack/combo-price, and promotion subworkflows.
 
 Display a prominent reminder that `/customer` returns to the kiosk. Use guided
 numbered menus, field validation, a change preview, and Y/N confirmation before
 each administrative update is persisted. Persist a confirmed change
 immediately.
 
-## Deferred seat confirmation
+## Deferred seat confirmation (implemented)
 
 ### Tentative state
 
@@ -558,33 +574,34 @@ flows, using the existing immutable `Pricing` and `PricingStorage` contracts.
   save uses the existing canonical `PricingStorage` serialization.
 - Existing `TicketSelection`, `SnackSelection`, `PromoCode`, and `Bill`
   snapshots are unaffected by later configuration changes. Role routing and full
-  UserGuide administrator instructions remain deferred.
+  UserGuide administrator instructions are completed by the integration layer.
 
 ### Role routing and deferred confirmation
 
 Branch: `codex/admin-role-routing`
 
-Grill, PRD, and TDD must resolve:
+Implemented scope:
 
-- the shared application-loop interface and typed transitions;
-- global-command interception at every prompt;
-- customer session ownership and discard semantics;
-- pure bill formatting and failure injection;
-- final confirmation ordering and exactly-once interaction;
-- conflict refresh and same-screening retry;
-- persistence-failure post-session behaviour;
-- successful post-bill prompt behaviour; and
-- synchronized forced-termination testing.
+- shared typed terminal outcomes and role transitions;
+- trimmed mixed-case `/admin`, `/customer`, and `/exit` at all typed prompts;
+- customer-session discard semantics with only in-memory tentative seats;
+- pure bill formatting before exactly-once final confirmation;
+- same-screening refresh and retry after a final seat conflict;
+- persistence-failure and successful-post-bill outcomes; and
+- missing-seat browse and failed-new-file persistence corrections.
+
+The approved exclusions remain booking records/payment, cross-process locking,
+screening moves/manual ordering/auditorium rules, and a new transaction subsystem.
 
 ### Documentation and integration
 
 Branch: `codex/admin-documentation`
 
 Update `docs/UserGuide.md`, `docs/DeveloperGuide.md`, `docs/Reflections.md`,
-runtime-data documentation, and task logs to match only implemented and verified
-behaviour. Reconcile this plan's status, run final integration verification, and
-prepare the integration branch for owner review without merging it into
-`master`.
+runtime-data documentation, requirements-to-tests records, and task logs to match
+only implemented and verified behaviour. Reconcile this plan's status, run final
+integration verification, and prepare the integration branch for owner review
+without merging it into `master`.
 
 ## New-task prompt template
 

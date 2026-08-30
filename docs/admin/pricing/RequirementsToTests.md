@@ -36,7 +36,10 @@ and passed 272 tests. The aggregate JaCoCo line and branch coverage gate also
 passed. Coverage is not treated as evidence in place of these behavioral and
 byte-level assertions.
 
-## Deferred acceptance items
+## Integration status
 
-Cross-role routing, end-user administrator instructions, and booking persistence
-of completed snapshots remain outside this workstream.
+Cross-role routing and end-user administrator instructions are implemented by
+the role-routing integration. `Utf8Terminal` maps raw commands to the shared
+typed terminal contract, and `AdministratorApplication` delegates the homepage's
+Pricing and Promotions section to this workflow. Booking persistence of completed
+snapshots remains outside scope.

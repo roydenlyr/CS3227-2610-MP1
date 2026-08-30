@@ -8,7 +8,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -20,7 +19,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Initializes, reads, and updates temporary screening seat occupancy.
+ * Reads and atomically updates temporary screening seat occupancy.
  */
 public final class SeatStorage {
     private final Path runtimeSeatsPath;
@@ -48,14 +47,15 @@ public final class SeatStorage {
      * @param knownScreeningIds Screening IDs in the current catalog.
      * @return Immutable set of occupied seats for the requested screening.
      * @throws IllegalArgumentException If the requested screening or known ID set is invalid.
-     * @throws SeatStorageException If initialization, reading, or validation fails.
+     * @throws SeatStorageException If reading or validation fails.
      */
     public Set<SeatCoordinate> loadTakenSeats(
             String screeningId, Set<String> knownScreeningIds) throws SeatStorageException {
         Set<String> validatedKnownScreeningIds = validateKnownScreeningIds(knownScreeningIds);
         validateRequestedScreeningId(screeningId, validatedKnownScreeningIds);
-        initializeIfMissing();
-
+        if (!Files.exists(runtimeSeatsPath)) {
+            return Set.of();
+        }
         Map<String, Set<SeatCoordinate>> takenSeatsByScreening = readAll(validatedKnownScreeningIds);
         return takenSeatsByScreening.getOrDefault(screeningId, Set.of());
     }
@@ -139,9 +139,9 @@ public final class SeatStorage {
         Set<String> validatedKnownScreeningIds = validateKnownScreeningIds(knownScreeningIds);
         validateRequestedScreeningId(screeningId, validatedKnownScreeningIds);
         Set<SeatCoordinate> validatedSeats = validateSeats(seats);
-        initializeIfMissing();
-
-        Map<String, Set<SeatCoordinate>> persistedState = readAll(validatedKnownScreeningIds);
+        Map<String, Set<SeatCoordinate>> persistedState = Files.exists(runtimeSeatsPath)
+                ? readAll(validatedKnownScreeningIds)
+                : Map.of();
         Set<SeatCoordinate> unavailableSeats = new TreeSet<>(validatedSeats);
         unavailableSeats.retainAll(persistedState.getOrDefault(screeningId, Set.of()));
         if (!unavailableSeats.isEmpty()) {
@@ -200,29 +200,6 @@ public final class SeatStorage {
         }
     }
 
-    private void initializeIfMissing() throws SeatStorageException {
-        if (Files.exists(runtimeSeatsPath)) {
-            return;
-        }
-
-        try {
-            operationHook.before(SeatStorageOperation.CREATE_DIRECTORIES, runtimeSeatsPath.getParent());
-            Files.createDirectories(runtimeSeatsPath.getParent());
-            operationHook.before(SeatStorageOperation.INITIALIZE_TARGET, runtimeSeatsPath);
-            Files.writeString(
-                    runtimeSeatsPath,
-                    SeatParser.HEADER_LINE + "\n",
-                    UTF_8,
-                    StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.WRITE);
-        } catch (FileAlreadyExistsException exception) {
-            // Another caller initialized the file after the existence check.
-        } catch (IOException exception) {
-            throw new SeatStorageException(
-                    "Unable to initialize seat occupancy '" + runtimeSeatsPath + "'.", exception);
-        }
-    }
-
     private Map<String, Set<SeatCoordinate>> readAll(Set<String> knownScreeningIds)
             throws SeatStorageException {
         try (BufferedReader reader = Files.newBufferedReader(runtimeSeatsPath, UTF_8)) {
@@ -248,6 +225,8 @@ public final class SeatStorage {
         String serializedState = serialize(takenSeatsByScreening);
         Path temporaryPath = null;
         try {
+            operationHook.before(SeatStorageOperation.CREATE_DIRECTORIES, runtimeSeatsPath.getParent());
+            Files.createDirectories(runtimeSeatsPath.getParent());
             operationHook.before(SeatStorageOperation.CREATE_TEMPORARY, runtimeSeatsPath.getParent());
             temporaryPath = Files.createTempFile(
                     runtimeSeatsPath.getParent(), "cinecli-seats-", ".tmp");

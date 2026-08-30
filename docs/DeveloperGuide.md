@@ -2,17 +2,14 @@
 
 ## Project status
 
-This repository implements a customer vertical slice from the welcome screen to
-catalog display, screening selection, terminal seat selection, ticket demographic
-selection, optional snacks and combos, optional promotion input, and an itemized
-bill. Catalog, global pricing, and temporary seat occupancy data are strictly
-validated and persisted as versioned plain text. Ticket, snack, promotion, and
-bill selections remain session-only snapshots.
-
-Movie Management, Screening Management, and Pricing and Promotions Management
-are implemented as administrator workflow modules. `Main` still wires only the
-customer workflow: administrator role routing and its end-user entry point remain
-deferred. Payment and booking persistence are also deferred.
+This repository implements customer and administrator CLI roles. The customer
+role reaches catalog display, screening and tentative-seat selection, ticket
+demographics, optional snacks and promotions, final atomic seat confirmation,
+and an itemized bill. The administrator role reaches Movie Management, Screening
+Management, and Pricing and Promotions Management. Catalog, global pricing, and
+temporary seat occupancy data are strictly validated and persisted as versioned
+plain text. Ticket, snack, promotion, and bill selections remain session-only
+snapshots. Payment and booking persistence remain deferred.
 
 ## Toolchain
 
@@ -58,13 +55,17 @@ java -jar target/cinecli-0.1.0-SNAPSHOT.jar
 
 The implemented responsibilities are intentionally small:
 
-- `Main` wires UTF-8 system streams, catalog, seat, and pricing runtime paths,
-  the customer UI, and customer storage. It does not yet select an administrator
-  workflow.
+- `Main` is a thin UTF-8 stream and runtime-path bootstrap.
+- `ApplicationRouter` owns the role loop, shared dependency wiring, and the
+  recovery gate before each role receives catalogue or occupancy access.
+- `Utf8Terminal` is the shared terminal adapter. It maps trimmed,
+  case-insensitive `/admin`, `/customer`, and `/exit` input to typed results.
+- `AdministratorApplication` owns only the administrator homepage and delegates
+  to the existing three administrator workflow applications.
 - `CustomerApplication` loads pricing after the welcome step and, when that
-  succeeds, coordinates catalog selection, seat-selection rules, confirmation,
-  ticket and snack selection, promo input, bill creation, and graceful storage
-  failure.
+  succeeds, coordinates catalog selection, in-memory tentative seats, ticket and
+  snack selection, promo input, bill rendering before final confirmation, and
+  graceful storage failure.
 - `CustomerUi` owns customer-facing input prompts and output formatting, including
   the fixed terminal seat map, menus, and four-section itemized bill.
 - `Movie`, `Screening`, `ContentRating`, `ScreeningSelection`, `SeatCoordinate`,
@@ -75,8 +76,8 @@ The implemented responsibilities are intentionally small:
 - `CatalogStorage` initializes missing runtime data and reads the file.
 - `CatalogParser` strictly parses and validates the versioned text format before
   returning any movies.
-- `SeatStorage` initializes, reads, and atomically replaces temporary seat
-  occupancy data.
+- `SeatStorage` reads missing occupancy as empty without initialization and
+  atomically creates or replaces it only on successful final confirmation.
 - `SeatParser` strictly validates all temporary occupancy records before any seat
   state is returned or updated.
 - `PricingStorage` seeds a missing runtime pricing file, validates and loads a
@@ -101,10 +102,10 @@ The implemented responsibilities are intentionally small:
   modules. Movie and Screening deletion retain their distinct semantic previews
   and result models.
 
-No booking or checkout persistence, payment processing, administrator role
-routing, or production dependency has been introduced. The temporary seat writer
-is intentionally isolated so booking-owned seat allocations can replace it
-without changing the terminal map.
+No booking or checkout persistence, payment processing, cross-process locking,
+or production dependency has been introduced. The temporary seat writer is
+intentionally isolated so booking-owned seat allocations can replace it without
+changing the terminal map.
 
 ## Testing
 
@@ -124,7 +125,11 @@ retries, occupancy preservation and clearing, cancellation, storage failures,
 durable deletion-journal recovery, Movie-deletion regression behaviour, fixed-price
 edits, promotion CRUD/rename/collision rules, and truthful pricing-save failures.
 Tests also prove a later complete pricing replacement does not alter captured
-ticket, snack, promotion, or bill snapshots.
+ticket, snack, promotion, or bill snapshots. Integration tests cover role
+routing from customer and administrator prompts, mixed-case global commands,
+administrator-home delegation, recovery before role access, deferred
+confirmation conflict/retry, cancellation and terminal failures, and the rule
+that a failed bill write after successful confirmation does not roll back seats.
 Tests never read or write the real `data/runtime` directory.
 
 Run the complete build with `clean verify` before considering an implementation
@@ -140,8 +145,10 @@ accepts lowercase input but stores one-based movie and timing positions.
 Every screening uses the same 7-by-20 layout. The UI renders `SCREEN` above row
 `G`, rows in the order `G` through `A`, and numbers `1` through `20` below row `A`.
 Previously taken seats and tentative session selections both render as `X`.
-Tentative seats are written only after the user confirms them with `Y`; declining
-clears them and returns to the original persisted map.
+Tentative seats remain in memory after the user confirms them with `Y`; declining
+clears them and returns to the original persisted map. The workflow creates the
+complete bill text before it reloads occupancy and atomically confirms those
+seats. It writes that already-rendered bill only after persistence succeeds.
 
 After a customer proceeds from the welcome screen, `CustomerApplication` loads
 the immutable `Pricing` state before it loads the catalog or accesses seat
@@ -203,10 +210,25 @@ their columns remain consistent. Currency keeps exact two-decimal-cent output an
 adds comma grouping for large values. The amount saved and repeated discount are
 printed as negative adjustments, including `-S$0.00` when no promotion applies.
 
-## Administrator workflow modules
+## Role routing and administrator workflow modules
 
-The administrator modules are independently runnable through their application
-seams, pending role routing. Both show persisted state, stage Add/Edit/Delete
+`ApplicationRouter` starts in customer mode and owns only role transitions and
+the shared composition graph. It constructs `CatalogStorage`, `SeatStorage`,
+`PricingStorage`, `MovieDeletionTransaction`, `CatalogRecoveryGate`, the customer
+application, and the administrator homepage once. Before dispatching either role,
+it invokes the single recovery gate; a recovery failure is reported without
+dispatching a workflow. `Main` contains no feature workflow logic.
+
+The shared `Utf8Terminal` parses raw input once. Trimmed, case-insensitive
+`/admin`, `/customer`, and `/exit` commands become typed terminal outcomes at
+every prompt. A global command abandons only in-memory customer state. Local
+`/cancel` and workflow Back choices stay within the active workflow's normal
+typed outcomes.
+
+`AdministratorApplication` renders the three-option homepage (Movie Management,
+Screening Management, and Pricing and Promotions Management) and delegates to
+the existing applications; it does not own their business logic. The administrator
+modules show persisted state, stage Add/Edit/Delete
 changes, show a preview, and require `Y` confirmation; `N`, `/cancel`, EOF,
 input failure, output failure, and storage failures leave uncommitted state
 unchanged or terminate/report through their typed outcome as appropriate.
@@ -231,7 +253,8 @@ add, or reschedule.
 The shared transaction writes one durable journal before a cascaded catalogue/
 occupancy deletion. The journal records either `DELETE_MOVIE` or
 `DELETE_SCREENING`, its subject, and the original and intended snapshots. The
-recovery gate runs before either administrator module accesses affected data;
+recovery gate runs in `ApplicationRouter` before either role accesses affected
+data;
 valid pending work is completed idempotently, while malformed or divergent journal
 state blocks access rather than guessing. The standard runtime journal location
 for later routing is `data/runtime/catalog-transaction.journal`.
@@ -312,11 +335,14 @@ from `A1` through `G20`, and every record must refer to an existing catalog
 screening. Duplicate coordinates, blank or unknown records, unsupported versions,
 and malformed fields reject the complete file.
 
-The seat store reloads and validates the entire file before confirmation, rejects
-an already-taken coordinate, writes the canonical state to a same-directory
-temporary file, and then atomically replaces the target. If atomic replacement is
-unsupported, the update fails and preserves the existing data. Inter-process
-locking is deliberately deferred because only one CineCLI process is expected.
+The seat store reads a missing file as empty without creating it. At final
+confirmation it reloads and validates the entire file, rejects an already-taken
+coordinate, writes canonical state to a same-directory temporary file, and then
+atomically replaces the target. A failed final write leaves an originally missing
+target missing; it never leaves an unintended newly created `seats.tsv`. If
+atomic replacement is unsupported, the update fails and preserves the existing
+data. Inter-process locking is deliberately deferred because only one CineCLI
+process is expected.
 
 This occupancy file is transitional. Once booking persistence is implemented,
 bookings will own seat allocations and availability will be derived from those

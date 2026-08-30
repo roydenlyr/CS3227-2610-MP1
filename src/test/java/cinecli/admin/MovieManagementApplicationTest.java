@@ -320,12 +320,6 @@ class MovieManagementApplicationTest {
         assertTrue(malformedCatalog.terminal().output().startsWith(
                 "Unable to access movie management: "));
 
-        Fixture malformedJournal = fixture(simpleCatalog(), null, lines("0"));
-        Files.writeString(malformedJournal.paths().journal(), "malformed\n", UTF_8);
-        assertEquals(AdminWorkflowOutcome.BACK, malformedJournal.application().run());
-        assertTrue(malformedJournal.terminal().output().startsWith(
-                "Unable to access movie management: "));
-
         Fixture malformedSeats = fixture(simpleCatalog(), "malformed\n", lines("3", "1"));
         assertEquals(AdminWorkflowOutcome.BACK, malformedSeats.application().run());
         assertTrue(malformedSeats.terminal().output().contains(

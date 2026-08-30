@@ -171,7 +171,7 @@ class SeatStorageTest {
     }
 
     @Test
-    void loadTakenSeats_missingFile_initializesHeaderOnlyFile() throws Exception {
+    void loadTakenSeats_missingFile_returnsEmptyWithoutCreatingFile() throws Exception {
         Path runtimeSeats = tempDirectory.resolve("data/runtime/seats.tsv");
         SeatStorage seatStorage = new SeatStorage(runtimeSeats);
 
@@ -179,8 +179,8 @@ class SeatStorageTest {
                 "SCR-001", KNOWN_SCREENING_IDS);
 
         assertAll(
-                () -> assertTrue(Files.exists(runtimeSeats)),
-                () -> assertEquals("CINECLI-SEATS\t1\n", Files.readString(runtimeSeats, UTF_8)),
+                () -> assertFalse(Files.exists(runtimeSeats)),
+                () -> assertFalse(Files.exists(runtimeSeats.getParent())),
                 () -> assertTrue(takenSeats.isEmpty()),
                 () -> assertThrows(UnsupportedOperationException.class,
                         () -> takenSeats.add(SeatCoordinate.parse("A1"))));
@@ -324,7 +324,7 @@ class SeatStorageTest {
     }
 
     @Test
-    void load_initializationFailure_wrapsCauseAndLeavesFileMissing() {
+    void confirmSeats_directoryCreationFailure_leavesMissingTargetMissing() {
         Path runtimeSeats = runtimeSeatsPath();
         IOException cause = new IOException("simulated initialization failure");
         SeatStorage seatStorage = new SeatStorage(
@@ -337,7 +337,8 @@ class SeatStorageTest {
 
         SeatStorageException exception = assertThrows(
                 SeatStorageException.class,
-                () -> seatStorage.loadTakenSeats("SCR-001", KNOWN_SCREENING_IDS));
+                () -> seatStorage.confirmSeats(
+                        "SCR-001", Set.of(SeatCoordinate.parse("A1")), KNOWN_SCREENING_IDS));
 
         assertAll(
                 () -> assertEquals(cause, exception.getCause()),
@@ -345,14 +346,12 @@ class SeatStorageTest {
     }
 
     @Test
-    void load_concurrentInitialization_acceptsHeaderCreatedByOtherCaller() throws Exception {
+    void loadTakenSeats_missingFile_doesNotInvokePersistenceHooks() throws Exception {
         Path runtimeSeats = runtimeSeatsPath();
         SeatStorage seatStorage = new SeatStorage(
                 runtimeSeats,
                 (operation, path) -> {
-                    if (operation == SeatStorageOperation.INITIALIZE_TARGET) {
-                        Files.writeString(path, "CINECLI-SEATS\t1\n", UTF_8);
-                    }
+                    throw new AssertionError("Browsing must not persist occupancy.");
                 });
 
         Set<SeatCoordinate> seats = seatStorage.loadTakenSeats(
@@ -404,6 +403,25 @@ class SeatStorageTest {
         assertAll(
                 () -> assertTrue(exception.getMessage().contains("atomic replacement")),
                 () -> assertArrayEquals(originalBytes, Files.readAllBytes(runtimeSeats)));
+    }
+
+    @Test
+    void confirmSeats_atomicReplacementFailure_leavesMissingTargetMissing() {
+        Path runtimeSeats = runtimeSeatsPath();
+        SeatStorage seatStorage = new SeatStorage(
+                runtimeSeats,
+                (operation, path) -> {
+                    if (operation == SeatStorageOperation.ATOMIC_REPLACE) {
+                        throw new java.nio.file.AtomicMoveNotSupportedException(
+                                path.toString(), path.toString(), "simulated");
+                    }
+                });
+
+        assertAll(
+                () -> assertThrows(SeatStorageException.class,
+                        () -> seatStorage.confirmSeats(
+                                "SCR-001", Set.of(SeatCoordinate.parse("A1")), KNOWN_SCREENING_IDS)),
+                () -> assertFalse(Files.exists(runtimeSeats)));
     }
 
     @Test

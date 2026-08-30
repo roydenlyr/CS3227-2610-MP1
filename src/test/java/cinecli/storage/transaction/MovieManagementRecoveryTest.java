@@ -5,12 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import cinecli.admin.MovieManagementApplication;
 import cinecli.admin.AdminWorkflowOutcome;
+import cinecli.admin.MovieManagementApplication;
+import cinecli.admin.ui.AdminTerminal;
 import cinecli.admin.ui.EndOfInput;
+import cinecli.admin.ui.GlobalCommand;
 import cinecli.admin.ui.MovieManagementTerminal;
 import cinecli.admin.ui.SubmittedLine;
 import cinecli.admin.ui.TerminalInput;
+import cinecli.app.ApplicationRouter;
 import cinecli.storage.catalog.CatalogStorage;
 import cinecli.storage.catalog.CatalogTransactionAdapter;
 import cinecli.storage.exception.MovieDeletionCommitException;
@@ -32,27 +35,34 @@ class MovieManagementRecoveryTest {
     Path tempDirectory;
 
     @Test
-    void run_validPendingRecovery_reportsBeforeListingOrTerminatesOnOutputFailure() throws Exception {
+    void router_recoversPendingMovieDeletionBeforeCustomerAndAdministratorAccess() throws Exception {
         Paths successfulPaths = writeState();
         createPendingJournal(successfulPaths);
-        Terminal successfulTerminal = new Terminal("0");
-        MovieManagementApplication successful = application(
-                successfulPaths, transaction(successfulPaths), successfulTerminal);
+        RouterTerminal successfulTerminal = new RouterTerminal(
+                new GlobalCommand(GlobalCommand.Type.ADMIN),
+                new SubmittedLine("1"),
+                new GlobalCommand(GlobalCommand.Type.EXIT));
 
-        assertEquals(AdminWorkflowOutcome.BACK, successful.run());
-        assertTrue(successfulTerminal.output().startsWith(
-                "Pending movie deletion recovery completed.\nMovie Management"));
+        router(successfulPaths, successfulTerminal).run();
+
+        assertTrue(successfulTerminal.output().contains("Welcome to CineCLI"));
+        assertTrue(successfulTerminal.output().contains("Administrator Home"));
+        assertTrue(successfulTerminal.output().contains("Movie Management"));
         assertFalse(Files.exists(successfulPaths.journal()));
+        assertFalse(Files.readString(successfulPaths.catalog(), UTF_8).contains("MOVIE\tMOV-1\t"));
+    }
 
-        Paths failedOutputPaths = writeState();
-        createPendingJournal(failedOutputPaths);
-        Terminal failedTerminal = new Terminal("0");
-        failedTerminal.failedWriteNumber = 1;
-        MovieManagementApplication failed = application(
-                failedOutputPaths, transaction(failedOutputPaths), failedTerminal);
+    @Test
+    void router_recoveryFailureDoesNotDispatchWhenErrorOutputFails() throws Exception {
+        Paths paths = writeState();
+        Files.writeString(paths.journal(), "malformed\n", UTF_8);
+        RouterTerminal terminal = new RouterTerminal();
+        terminal.failErrorWrites = true;
 
-        assertEquals(AdminWorkflowOutcome.TERMINATED, failed.run());
-        assertEquals("Unable to write output. CineCLI will exit.\n", failedTerminal.errors());
+        router(paths, terminal).run();
+
+        assertTrue(terminal.errors().contains("Unable to recover pending catalogue changes:"));
+        assertEquals("", terminal.output());
     }
 
     @Test
@@ -110,6 +120,15 @@ class MovieManagementRecoveryTest {
             Paths paths, MovieDeletionTransaction transaction, Terminal terminal) {
         return new MovieManagementApplication(
                 new CatalogStorage(paths.catalog(), DEFAULT_RESOURCE), transaction, terminal);
+    }
+
+    private ApplicationRouter router(Paths paths, RouterTerminal terminal) {
+        return new ApplicationRouter(
+                terminal,
+                paths.catalog(),
+                paths.seats(),
+                paths.catalog().resolveSibling("pricing.tsv"),
+                DEFAULT_RESOURCE);
     }
 
     private MovieDeletionTransaction transaction(Paths paths) {
@@ -180,6 +199,42 @@ class MovieManagementRecoveryTest {
         public boolean writeError(String text) {
             errors.append(text);
             return true;
+        }
+
+        private String output() {
+            return output.toString();
+        }
+
+        private String errors() {
+            return errors.toString();
+        }
+    }
+
+    private static final class RouterTerminal implements AdminTerminal {
+        private final Deque<TerminalInput> inputs;
+        private final StringBuilder output = new StringBuilder();
+        private final StringBuilder errors = new StringBuilder();
+        private boolean failErrorWrites;
+
+        private RouterTerminal(TerminalInput... inputs) {
+            this.inputs = new ArrayDeque<>(Arrays.asList(inputs));
+        }
+
+        @Override
+        public TerminalInput readLine() {
+            return inputs.isEmpty() ? new EndOfInput() : inputs.removeFirst();
+        }
+
+        @Override
+        public boolean write(String text) {
+            output.append(text);
+            return true;
+        }
+
+        @Override
+        public boolean writeError(String text) {
+            errors.append(text);
+            return !failErrorWrites;
         }
 
         private String output() {

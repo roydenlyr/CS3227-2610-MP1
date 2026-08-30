@@ -2,8 +2,12 @@ package cinecli.customer.ui;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import cinecli.admin.ui.AdminTerminal;
+import cinecli.admin.ui.EndOfInput;
+import cinecli.admin.ui.TerminalInput;
 import cinecli.model.Bill;
 import cinecli.model.ContentRating;
 import cinecli.model.Movie;
@@ -18,7 +22,9 @@ import cinecli.model.TicketType;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Reader;
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -349,6 +355,59 @@ class CustomerUiTest {
                         "- 2 x Popcorn Combo (Popcorn + Soft Drink) - S$7.00 each",
                         "- 3 x Nachos - S$6.00 each"),
                 nonblankLines);
+    }
+
+    @Test
+    void terminalWriter_tracksWriteFailureAndKeepsCloseOwnedByApplication() throws Exception {
+        AdminTerminal failingTerminal = new AdminTerminal() {
+            @Override
+            public TerminalInput readLine() {
+                return new EndOfInput();
+            }
+
+            @Override
+            public boolean write(String text) {
+                return false;
+            }
+
+            @Override
+            public boolean writeError(String text) {
+                return false;
+            }
+        };
+        CustomerUi customerUi = new CustomerUi(failingTerminal);
+
+        customerUi.showSeatsConfirmed(Set.of(SeatCoordinate.parse("A1")));
+        Field outputField = CustomerUi.class.getDeclaredField("output");
+        outputField.setAccessible(true);
+        ((PrintWriter) outputField.get(customerUi)).close();
+
+        assertFalse(customerUi.isOutputAvailable());
+    }
+
+    @Test
+    void terminalWriter_tracksIndependentErrorWriteFailure() {
+        AdminTerminal errorFailingTerminal = new AdminTerminal() {
+            @Override
+            public TerminalInput readLine() {
+                return new EndOfInput();
+            }
+
+            @Override
+            public boolean write(String text) {
+                return true;
+            }
+
+            @Override
+            public boolean writeError(String text) {
+                return false;
+            }
+        };
+        CustomerUi customerUi = new CustomerUi(errorFailingTerminal);
+
+        customerUi.showSeatStorageError("simulated failure");
+
+        assertFalse(customerUi.isOutputAvailable());
     }
 
     private CustomerUi createUi(StringWriter output) {
