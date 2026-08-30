@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cinecli.admin.AdminWorkflowOutcome;
-import cinecli.admin.TicketPriceManagementApplication;
+import cinecli.admin.pricing.TicketPriceManagementApplication;
 import cinecli.admin.ui.AdminTerminal;
 import cinecli.admin.ui.EndOfInput;
 import cinecli.admin.ui.SubmittedLine;

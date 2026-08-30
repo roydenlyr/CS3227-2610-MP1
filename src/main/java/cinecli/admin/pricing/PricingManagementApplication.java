@@ -1,5 +1,9 @@
-package cinecli.admin;
+package cinecli.admin.pricing;
 
+import cinecli.admin.AdminInputRules;
+import cinecli.admin.AdminWorkflowInput;
+import cinecli.admin.AdminWorkflowInteraction;
+import cinecli.admin.AdminWorkflowOutcome;
 import cinecli.admin.ui.AdminTerminal;
 import cinecli.storage.exception.PricingStorageException;
 import cinecli.storage.pricing.PricingStorage;

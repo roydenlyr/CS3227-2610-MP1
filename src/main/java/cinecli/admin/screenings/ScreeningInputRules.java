@@ -1,4 +1,4 @@
-package cinecli.admin;
+package cinecli.admin.screenings;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

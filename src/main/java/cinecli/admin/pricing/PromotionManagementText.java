@@ -1,4 +1,4 @@
-package cinecli.admin;
+package cinecli.admin.pricing;
 
 import cinecli.model.PromoCode;
 import java.util.List;

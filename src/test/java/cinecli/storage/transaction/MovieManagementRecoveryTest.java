@@ -6,11 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cinecli.admin.AdminWorkflowOutcome;
-import cinecli.admin.MovieManagementApplication;
+import cinecli.admin.movies.MovieManagementApplication;
 import cinecli.admin.ui.AdminTerminal;
 import cinecli.admin.ui.EndOfInput;
 import cinecli.admin.ui.GlobalCommand;
-import cinecli.admin.ui.MovieManagementTerminal;
+import cinecli.admin.movies.MovieManagementTerminal;
 import cinecli.admin.ui.SubmittedLine;
 import cinecli.admin.ui.TerminalInput;
 import cinecli.app.ApplicationRouter;

@@ -1,4 +1,4 @@
 /**
- * Coordinates administrator catalogue and pricing workflows.
+ * Coordinates administrator workflows and exposes their shared interaction contracts.
  */
 package cinecli.admin;

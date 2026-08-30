@@ -1,9 +1,10 @@
-package cinecli.admin;
+package cinecli.admin.pricing;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import cinecli.admin.AdminWorkflowOutcome;
 import cinecli.admin.ui.AdminTerminal;
 import cinecli.admin.ui.EndOfInput;
 import cinecli.admin.ui.GlobalCommand;

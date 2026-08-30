@@ -1,8 +1,12 @@
-package cinecli.admin;
+package cinecli.admin.movies;
 
+import cinecli.admin.AdminInputRules;
 import cinecli.admin.AdminInputRules.Confirmation;
+import cinecli.admin.AdminWorkflowInput;
+import cinecli.admin.AdminWorkflowInteraction;
+import cinecli.admin.AdminWorkflowOutcome;
+import cinecli.admin.UuidGenerator;
 import cinecli.admin.ui.AdminTerminal;
-import cinecli.admin.ui.MovieManagementTerminal;
 import cinecli.model.ContentRating;
 import cinecli.model.Movie;
 import cinecli.storage.catalog.CatalogStorage;

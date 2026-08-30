@@ -2,9 +2,9 @@ package cinecli.app;
 
 import cinecli.admin.AdminWorkflowOutcome;
 import cinecli.admin.AdministratorApplication;
-import cinecli.admin.MovieManagementApplication;
-import cinecli.admin.PricingManagementApplication;
-import cinecli.admin.ScreeningManagementApplication;
+import cinecli.admin.movies.MovieManagementApplication;
+import cinecli.admin.pricing.PricingManagementApplication;
+import cinecli.admin.screenings.ScreeningManagementApplication;
 import cinecli.admin.ui.AdminTerminal;
 import cinecli.customer.CustomerApplication;
 import cinecli.customer.CustomerWorkflowOutcome;

@@ -1,4 +1,4 @@
-package cinecli.admin;
+package cinecli.admin.movies;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -7,11 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import cinecli.admin.AdminWorkflowOutcome;
+import cinecli.admin.UuidGenerator;
 import cinecli.admin.ui.AdminTerminal;
 import cinecli.admin.ui.EndOfInput;
 import cinecli.admin.ui.GlobalCommand;
 import cinecli.admin.ui.InputFailure;
-import cinecli.admin.ui.MovieManagementTerminal;
 import cinecli.admin.ui.SubmittedLine;
 import cinecli.admin.ui.TerminalInput;
 import cinecli.storage.catalog.CatalogStorage;

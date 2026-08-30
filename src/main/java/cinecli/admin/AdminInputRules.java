@@ -3,16 +3,21 @@ package cinecli.admin;
 import java.util.regex.Pattern;
 
 /** Interprets input rules shared by guided administrator workflows. */
-final class AdminInputRules {
+public final class AdminInputRules {
     private static final Pattern NUMBER_PATTERN = Pattern.compile("0|[1-9][0-9]*");
 
-    enum Confirmation {
+    public enum Confirmation {
         CONFIRMED,
         CANCELLED,
         INVALID
     }
 
-    Integer parseNumber(String input, int minimum, int maximum) {
+    /** Creates the shared administrator input interpreter. */
+    public AdminInputRules() {
+    }
+
+    /** Parses a whole number within the specified inclusive bounds. */
+    public Integer parseNumber(String input, int minimum, int maximum) {
         String normalized = input.strip();
         if (!NUMBER_PATTERN.matcher(normalized).matches()) {
             return null;
@@ -25,11 +30,13 @@ final class AdminInputRules {
         }
     }
 
-    boolean isCancel(String input) {
+    /** Returns whether the input requests cancellation of the current operation. */
+    public boolean isCancel(String input) {
         return input.strip().equalsIgnoreCase("/cancel");
     }
 
-    Confirmation parseConfirmation(String input) {
+    /** Interprets a confirmation response. */
+    public Confirmation parseConfirmation(String input) {
         String normalized = input.strip();
         if (normalized.equalsIgnoreCase("Y")) {
             return Confirmation.CONFIRMED;

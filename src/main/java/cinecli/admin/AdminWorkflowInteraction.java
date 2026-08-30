@@ -10,17 +10,19 @@ import java.util.Objects;
 /**
  * Owns the common fallible terminal interaction rules for administrator workflows.
  */
-final class AdminWorkflowInteraction {
+public final class AdminWorkflowInteraction {
     private static final String OUTPUT_FAILURE = "Unable to write output. CineCLI will exit.\n";
     private static final String INPUT_FAILURE = "Unable to read input. CineCLI will exit.\n";
 
     private final AdminTerminal terminal;
 
-    AdminWorkflowInteraction(AdminTerminal terminal) {
+    /** Creates the shared administrator terminal interaction helper. */
+    public AdminWorkflowInteraction(AdminTerminal terminal) {
         this.terminal = Objects.requireNonNull(terminal);
     }
 
-    AdminWorkflowInput read() {
+    /** Reads one submitted line or typed terminal outcome. */
+    public AdminWorkflowInput read() {
         TerminalInput input = terminal.readLine();
         if (input instanceof SubmittedLine(String value)) {
             return new AdminWorkflowInput(value, null);
@@ -39,15 +41,12 @@ final class AdminWorkflowInteraction {
         return new AdminWorkflowInput(null, AdminWorkflowOutcome.TERMINATED);
     }
 
-    boolean write(String text) {
+    /** Writes text and reports whether the terminal accepted it. */
+    public boolean write(String text) {
         if (terminal.write(text)) {
             return true;
         }
         terminal.writeError(OUTPUT_FAILURE);
         return false;
     }
-}
-
-/** Carries one submitted administrator line or a typed workflow outcome. */
-record AdminWorkflowInput(String line, AdminWorkflowOutcome outcome) {
 }

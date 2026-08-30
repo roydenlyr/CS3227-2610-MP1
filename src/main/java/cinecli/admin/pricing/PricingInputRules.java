@@ -1,4 +1,4 @@
-package cinecli.admin;
+package cinecli.admin.pricing;
 
 import java.util.regex.Pattern;
 

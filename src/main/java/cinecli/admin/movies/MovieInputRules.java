@@ -1,4 +1,4 @@
-package cinecli.admin;
+package cinecli.admin.movies;
 
 import cinecli.model.ContentRating;
 import java.util.List;

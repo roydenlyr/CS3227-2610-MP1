@@ -1,35 +1,39 @@
-package cinecli.admin;
+package cinecli.admin.pricing;
 
+import cinecli.admin.AdminInputRules;
 import cinecli.admin.AdminInputRules.Confirmation;
+import cinecli.admin.AdminWorkflowInput;
+import cinecli.admin.AdminWorkflowInteraction;
+import cinecli.admin.AdminWorkflowOutcome;
 import cinecli.admin.ui.AdminTerminal;
 import cinecli.model.Pricing;
-import cinecli.model.SnackMenuItem;
+import cinecli.model.TicketType;
 import cinecli.storage.exception.PricingStorageException;
 import cinecli.storage.pricing.PricingStorage;
 import java.util.Objects;
 
-/** Coordinates administrator workflows for fixed snack and combo price changes. */
-public final class SnackComboPriceManagementApplication {
+/** Coordinates administrator workflows for fixed ticket-price changes. */
+public final class TicketPriceManagementApplication {
     private final PricingStorage pricingStorage;
     private final AdminWorkflowInteraction interaction;
     private final AdminInputRules inputRules = new AdminInputRules();
     private final PricingInputRules pricingInputRules = new PricingInputRules();
-    private final SnackComboPriceManagementText text = new SnackComboPriceManagementText();
+    private final TicketPriceManagementText text = new TicketPriceManagementText();
 
-    /** Creates the snack and combo price workflow. */
-    public SnackComboPriceManagementApplication(PricingStorage pricingStorage, AdminTerminal terminal) {
+    /** Creates the ticket-price workflow. */
+    public TicketPriceManagementApplication(PricingStorage pricingStorage, AdminTerminal terminal) {
         this.pricingStorage = Objects.requireNonNull(pricingStorage);
         this.interaction = new AdminWorkflowInteraction(Objects.requireNonNull(terminal));
     }
 
-    /** Runs snack and combo price management until a navigation or termination outcome occurs. */
+    /** Runs ticket-price management until a navigation or termination outcome occurs. */
     public AdminWorkflowOutcome run() {
         while (true) {
             Pricing pricing;
             try {
                 pricing = pricingStorage.load();
             } catch (PricingStorageException exception) {
-                return reportStorageFailure(SnackComboPriceManagementText.ACCESS_FAILURE_PREFIX, exception);
+                return reportStorageFailure(TicketPriceManagementText.ACCESS_FAILURE_PREFIX, exception);
             }
             if (!write(text.management(pricing))) {
                 return AdminWorkflowOutcome.TERMINATED;
@@ -49,51 +53,51 @@ public final class SnackComboPriceManagementApplication {
             }
             Integer choice = inputRules.parseNumber(input.line, 0, 1);
             if (choice == null) {
-                if (!write(SnackComboPriceManagementText.ACTION_ERROR_WITH_PROMPT)) {
+                if (!write(TicketPriceManagementText.ACTION_ERROR_WITH_PROMPT)) {
                     return AdminWorkflowOutcome.TERMINATED;
                 }
                 continue;
             }
-            return choice == 0 ? AdminWorkflowOutcome.BACK : editSnackPrice(pricing);
+            return choice == 0 ? AdminWorkflowOutcome.BACK : editTicketPrice(pricing);
         }
     }
 
-    private AdminWorkflowOutcome editSnackPrice(Pricing pricing) {
+    private AdminWorkflowOutcome editTicketPrice(Pricing pricing) {
         TargetResult target = requestTarget();
         if (target.outcome != null) {
             return target.outcome;
         }
         if (target.isCancelled) {
-            return cancel(SnackComboPriceManagementText.EDIT_CANCELLED);
+            return cancel(TicketPriceManagementText.EDIT_CANCELLED);
         }
-        SnackMenuItem menuItem = SnackMenuItem.values()[target.index];
-        ValueResult<Integer> price = requestPrice(menuItem);
+        TicketType ticketType = TicketType.values()[target.index];
+        ValueResult<Integer> price = requestPrice(ticketType);
         if (price.outcome != null) {
             return price.outcome;
         }
         if (price.isCancelled) {
-            return cancel(SnackComboPriceManagementText.EDIT_CANCELLED);
+            return cancel(TicketPriceManagementText.EDIT_CANCELLED);
         }
-        int originalPriceInCents = pricing.snackPriceInCents(menuItem);
+        int originalPriceInCents = pricing.ticketPriceInCents(ticketType);
         if (price.value == originalPriceInCents) {
-            return write(SnackComboPriceManagementText.PRICE_UNCHANGED)
+            return write(TicketPriceManagementText.PRICE_UNCHANGED)
                     ? null : AdminWorkflowOutcome.TERMINATED;
         }
-        Pricing intended = PricingReplacements.withSnackPrice(pricing, menuItem, price.value);
+        Pricing intended = PricingReplacements.withTicketPrice(pricing, ticketType, price.value);
         ConfirmationResult confirmation = confirm(
-                text.editPreview(menuItem, originalPriceInCents, price.value));
+                text.editPreview(ticketType, originalPriceInCents, price.value));
         if (confirmation.outcome != null) {
             return confirmation.outcome;
         }
         if (!confirmation.isConfirmed) {
-            return cancel(SnackComboPriceManagementText.EDIT_CANCELLED);
+            return cancel(TicketPriceManagementText.EDIT_CANCELLED);
         }
         try {
             pricingStorage.save(intended);
         } catch (PricingStorageException exception) {
-            return reportStorageFailure(SnackComboPriceManagementText.CHANGE_NOT_SAVED_PREFIX, exception);
+            return reportStorageFailure(TicketPriceManagementText.CHANGE_NOT_SAVED_PREFIX, exception);
         }
-        return write(text.updated(menuItem, price.value)) ? null : AdminWorkflowOutcome.TERMINATED;
+        return write(text.updated(ticketType, price.value)) ? null : AdminWorkflowOutcome.TERMINATED;
     }
 
     private TargetResult requestTarget() {
@@ -108,9 +112,9 @@ public final class SnackComboPriceManagementApplication {
             if (inputRules.isCancel(input.line)) {
                 return TargetResult.cancelled();
             }
-            Integer choice = inputRules.parseNumber(input.line, 0, SnackMenuItem.values().length);
+            Integer choice = inputRules.parseNumber(input.line, 0, TicketType.values().length);
             if (choice == null) {
-                if (!write(SnackComboPriceManagementText.TARGET_ERROR)) {
+                if (!write(TicketPriceManagementText.TARGET_ERROR)) {
                     return TargetResult.outcome(AdminWorkflowOutcome.TERMINATED);
                 }
                 continue;
@@ -119,9 +123,9 @@ public final class SnackComboPriceManagementApplication {
         }
     }
 
-    private ValueResult<Integer> requestPrice(SnackMenuItem menuItem) {
+    private ValueResult<Integer> requestPrice(TicketType ticketType) {
         while (true) {
-            if (!write(text.pricePrompt(menuItem))) {
+            if (!write(text.pricePrompt(ticketType))) {
                 return ValueResult.outcome(AdminWorkflowOutcome.TERMINATED);
             }
             ReadResult input = read();
@@ -133,7 +137,7 @@ public final class SnackComboPriceManagementApplication {
             }
             Integer priceInCents = pricingInputRules.parsePriceInCents(input.line);
             if (priceInCents == null) {
-                if (!write(SnackComboPriceManagementText.PRICE_ERROR)) {
+                if (!write(TicketPriceManagementText.PRICE_ERROR)) {
                     return ValueResult.outcome(AdminWorkflowOutcome.TERMINATED);
                 }
                 continue;
@@ -158,7 +162,7 @@ public final class SnackComboPriceManagementApplication {
             if (answer == Confirmation.CANCELLED) {
                 return ConfirmationResult.cancelled();
             }
-            if (!write(SnackComboPriceManagementText.CONFIRMATION_ERROR)) {
+            if (!write(TicketPriceManagementText.CONFIRMATION_ERROR)) {
                 return ConfirmationResult.outcome(AdminWorkflowOutcome.TERMINATED);
             }
         }

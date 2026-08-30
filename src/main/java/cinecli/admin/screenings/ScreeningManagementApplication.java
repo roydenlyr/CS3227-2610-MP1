@@ -1,8 +1,13 @@
-package cinecli.admin;
+package cinecli.admin.screenings;
 
+import cinecli.admin.AdminInputRules;
 import cinecli.admin.AdminInputRules.Confirmation;
-import cinecli.admin.ScreeningManagementText.ScreeningLocation;
+import cinecli.admin.AdminWorkflowInput;
+import cinecli.admin.AdminWorkflowInteraction;
+import cinecli.admin.AdminWorkflowOutcome;
+import cinecli.admin.UuidGenerator;
 import cinecli.admin.ui.AdminTerminal;
+import cinecli.admin.screenings.ScreeningManagementText.ScreeningLocation;
 import cinecli.model.Movie;
 import cinecli.model.Screening;
 import cinecli.storage.catalog.CatalogStorage;

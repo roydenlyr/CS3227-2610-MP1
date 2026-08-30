@@ -1,6 +1,9 @@
 package cinecli.admin;
 
 import cinecli.admin.ui.AdminTerminal;
+import cinecli.admin.movies.MovieManagementApplication;
+import cinecli.admin.pricing.PricingManagementApplication;
+import cinecli.admin.screenings.ScreeningManagementApplication;
 import java.util.Objects;
 
 /** Coordinates the administrator homepage and its existing management workflows. */

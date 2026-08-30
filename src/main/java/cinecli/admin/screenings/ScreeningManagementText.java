@@ -1,4 +1,4 @@
-package cinecli.admin;
+package cinecli.admin.screenings;
 
 import cinecli.model.Movie;
 import cinecli.model.Screening;
