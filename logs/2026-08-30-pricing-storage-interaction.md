@@ -64,4 +64,3 @@ The planned dependency order was pricing persistence and domain snapshots first,
 - Later role-routing integration.
 - Persistence of captured price snapshots with any future booking persistence work.
 - Re-evaluation of a shared atomic-storage helper in a later storage-focused workstream.
-
