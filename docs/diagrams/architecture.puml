@@ -1,0 +1,72 @@
+@startuml
+title CineCLI High-Level Architecture
+
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 40
+
+component Main
+component ApplicationRouter
+
+package "Role applications" {
+    component CustomerApplication
+    component AdministratorApplication
+}
+
+package "Administrator features" {
+    component MovieManagementApplication
+    component ScreeningManagementApplication
+    component PricingManagementApplication
+}
+
+component "Shared terminal abstraction" as Terminal
+
+package "Domain Model" {
+    component "Immutable domain data" as DomainModel
+}
+
+package "Storage" {
+    component CatalogStorage
+    component SeatStorage
+    component PricingStorage
+}
+
+package "Transaction and recovery" {
+    component MovieDeletionTransaction
+    component CatalogRecoveryGate
+}
+
+Main --> ApplicationRouter
+ApplicationRouter *-- CustomerApplication
+ApplicationRouter *-- AdministratorApplication
+ApplicationRouter *-- CatalogStorage
+ApplicationRouter *-- SeatStorage
+ApplicationRouter *-- PricingStorage
+ApplicationRouter *-- MovieDeletionTransaction
+ApplicationRouter *-- CatalogRecoveryGate
+ApplicationRouter --> Terminal
+
+CustomerApplication --> Terminal
+CustomerApplication --> DomainModel
+CustomerApplication --> CatalogStorage
+CustomerApplication --> SeatStorage
+CustomerApplication --> PricingStorage
+
+AdministratorApplication *-- MovieManagementApplication
+AdministratorApplication *-- ScreeningManagementApplication
+AdministratorApplication *-- PricingManagementApplication
+AdministratorApplication --> Terminal
+
+MovieManagementApplication --> CatalogStorage
+MovieManagementApplication --> MovieDeletionTransaction
+ScreeningManagementApplication --> CatalogStorage
+ScreeningManagementApplication --> MovieDeletionTransaction
+PricingManagementApplication --> PricingStorage
+
+CatalogRecoveryGate --> MovieDeletionTransaction
+@enduml

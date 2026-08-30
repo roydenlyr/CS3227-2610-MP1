@@ -12,3 +12,73 @@ results belong in the corresponding task summary under `logs/`.
   repeatable.
 - Persistence structure is reserved without selecting a data format prematurely.
 
+## 2026-08-23 - First customer vertical slice
+
+- A small versioned TSV format is sufficient for the approved read-only catalog
+  and keeps parsing possible with the Java standard library alone.
+- Treating missing data differently from malformed data prevents convenient seed
+  initialization from hiding corruption or silently discarding user state.
+- Injecting readers, writers, and runtime paths keeps an interactive CLI testable
+  without replacing global system streams or touching real runtime data.
+
+## 2026-08-23 - Terminal seat selection
+
+- Persisting occupied coordinates keeps domain state independent from the
+  terminal's derived `O` and `X` representation. For a fixed 140-seat layout,
+  readability and separation of concerns matter more than storage size.
+- Tentative and persisted seats can share the required `X` marker while remaining
+  different states internally; persistence occurs only after explicit
+  confirmation.
+- Isolating transitional occupancy storage behind `SeatStorage` makes the future
+  move to booking-owned seat allocations a localized replacement instead of a UI
+  rewrite.
+- Exact output tests are useful for spatial CLI requirements, such as keeping row
+  `G` next to `SCREEN` and the numeric axis below row `A`.
+
+## 2026-08-23 - Snack and combo selection
+
+- Storing fixed prices as integer cents avoids floating-point rounding concerns
+  while leaving customer-facing currency formatting in the UI.
+- Returning an explicit seat-selection result keeps the next workflow stage at
+  the application coordinator level and ensures the menu appears only after seat
+  persistence succeeds.
+- Keeping one optional snack or combo choice in memory satisfies the current
+  interaction requirement without inventing quantities, totals, checkout rules,
+  or a persistence schema before those requirements are approved.
+
+## 2026-08-23 - Multiple snack and combo quantities
+
+- The later quantity requirement intentionally supersedes the earlier single-choice
+  boundary while retaining the same fixed menu, prices, and session-only scope.
+- Pairing each item with a validated immutable quantity keeps malformed input out of
+  the selection state and gives the UI one clear value to format.
+- Keying selections by menu item lets customers correct a quantity by selecting the
+  item again, while insertion order keeps the final summary aligned with the order
+  in which different items were first chosen.
+- Separating the item prompt from the quantity prompt allows invalid quantities to
+  be retried without forcing customers to re-enter a valid item number.
+
+## 2026-08-23 - Ticket pricing and promotions
+
+- Associating a ticket type with each sorted seat coordinate makes the demographic
+  assignment deterministic and prevents ticket quantities from drifting away from
+  the number of confirmed seats.
+- Keeping percentages in a fixed enum and all monetary amounts in checked `long`
+  cents makes both the allowed promotions and their arithmetic explicit without a
+  floating-point dependency.
+- Rounding the final payable amount, then deriving the displayed discount, avoids
+  a one-cent inconsistency when a percentage produces exactly half a cent.
+- A session-only bill satisfies the approved checkout behavior while preserving
+  the existing persistence boundary until a booking schema is approved.
+
+## 2026-08-25 - Four-section bill summary
+
+- Passing the selected movie and screening to the final UI call keeps receipt
+  context available without making the arithmetic-focused `Bill` model depend on
+  catalog objects.
+- Small shared row-formatting helpers make a fixed-width CLI receipt easier to
+  review and test than scattered spacing literals.
+- Splitting combo names from their parenthesized contents preserves readable table
+  columns while retaining all item information from the menu.
+- Exact output tests are valuable when a visual example defines section rules,
+  alignment, capitalization, repeated totals, and large-number formatting.

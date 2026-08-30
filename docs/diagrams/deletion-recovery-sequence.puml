@@ -1,0 +1,67 @@
+@startuml
+title Catalog Deletion Transaction and Recovery
+
+hide footbox
+autonumber
+skinparam shadowing false
+skinparam maxMessageSize 45
+skinparam defaultFontSize 12
+
+actor Administrator
+participant "Movie / Screening Management" as Management
+participant MovieDeletionTransaction as Transaction
+participant CatalogStorage as Catalog
+participant SeatStorage as Seats
+database "Transaction Journal" as Journal
+participant ApplicationRouter as Router
+participant CatalogRecoveryGate as Gate
+
+== Normal deletion transaction ==
+Administrator -> Management : choose movie or screening deletion
+Management -> Transaction : prepare deletion
+Transaction -> Catalog : capture current catalog state
+Transaction -> Seats : capture current seat state
+Transaction --> Management : prepared deletion and impact preview
+Management -> Administrator : display preview and request confirmation
+Administrator -> Management : confirm
+
+alt childless movie deletion
+    Management -> Transaction : commit deletion
+    Transaction -> Catalog : apply intended catalog state
+else screening deletion or cascaded movie deletion
+    Management -> Transaction : commit deletion
+    Transaction -> Journal : publish original and intended snapshots
+    Transaction -> Catalog : apply intended catalog state
+    Transaction -> Seats : apply intended seat state when required
+    Transaction -> Journal : delete after successful completion
+end
+Transaction --> Management : deletion complete
+Management --> Administrator : display result
+
+== Recovery after interruption ==
+note over Router, Gate
+Before every role dispatch, the router invokes the recovery gate.
+end note
+Router -> Gate : recoverBeforeAccess()
+Gate -> Transaction : recover()
+Transaction -> Journal : read pending transaction
+Transaction -> Catalog : compare current state with original or intended snapshot
+Transaction -> Seats : compare current state with original or intended snapshot
+
+alt state is recoverable
+    Transaction -> Catalog : apply intended state if catalog is still original
+    Transaction -> Seats : apply intended state if required and still original
+    Transaction -> Journal : delete after intended state is complete
+    Transaction --> Gate : recovered
+    Gate --> Router : recovery complete
+    note right of Router
+    Dispatch the selected role.
+    end note
+else journal is malformed or state diverges
+    Transaction --> Gate : recovery failure
+    Gate --> Router : recovery failure
+    note right of Router
+    Report the failure; do not dispatch either role.
+    end note
+end
+@enduml

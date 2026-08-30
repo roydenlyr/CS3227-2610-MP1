@@ -1,0 +1,64 @@
+@startuml
+title Deferred Seat Confirmation During Customer Checkout
+
+hide footbox
+autonumber
+skinparam shadowing false
+skinparam maxMessageSize 45
+skinparam defaultFontSize 12
+
+actor Customer
+participant CustomerApplication as Application
+participant CustomerUi as Ui
+participant Bill
+participant SeatStorage as Seats
+database "seats.tsv" as SeatsFile
+
+note over Customer, Application
+Pricing and catalog are loaded and the customer has selected a screening.
+end note
+
+Customer -> Ui : select seats
+Ui --> Application : requested seat coordinates
+Application -> Ui : show tentative seats and request confirmation
+Customer -> Ui : confirm tentative seats
+Ui --> Application : confirmed seat set
+
+note right of Application
+Tentative seats are held only in memory. No persistent occupancy is changed.
+end note
+
+Application -> Ui : collect ticket, snack/combo, and promotion selections
+Customer -> Ui : completed selections
+Ui --> Application : immutable selection snapshots
+Application -> Bill : new Bill(ticket, snacks, promotion)
+Application -> Ui : renderBill(bill, movie, screening)
+Ui --> Application : complete bill text in memory
+
+note right of Application
+Required order: render bill in memory, then persist seats, then display the bill.
+end note
+
+Application -> Seats : confirmSeats(screeningId, seats, knownIds)
+Seats -> SeatsFile : reload and validate occupancy
+
+alt selected seat is now taken
+    Seats --> Application : SeatStorageException (conflict)
+    Application -> Ui : report conflict and return to seat selection
+    note right of Application
+    Do not display the bill. Do not change occupancy.
+    end note
+else other storage failure
+    Seats --> Application : SeatStorageException
+    Application -> Ui : report storage failure
+    note right of Application
+    End the unfinished purchase at the post-session prompt.
+    end note
+else seats remain available
+    Seats -> SeatsFile : write complete state to temp file; force; atomic replace
+    SeatsFile --> Seats : persistence succeeds
+    Seats --> Application : success
+    Application -> Ui : writeBill(already-rendered text)
+    Ui --> Customer : itemized bill
+end
+@enduml

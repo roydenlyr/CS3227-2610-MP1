@@ -36,6 +36,9 @@ conflicting rendered examples. Do not use tabs for Java indentation.
 
 ## Engineering workflow
 
+- Before grilling, designing, or implementing an admin-interface feature, read
+  `docs/AdminInterfacePlan.md` as the approved cross-feature scope, sequence, and
+  handoff reference.
 - Inspect the relevant repository state before proposing or making changes.
 - Distinguish explicit requirements, assumptions, and recommendations.
 - For substantial changes, explain the task, ambiguities, approach, relevant
@@ -48,6 +51,49 @@ conflicting rendered examples. Do not use tabs for Java indentation.
   Escalate decisions that materially affect product behavior, scope, architecture,
   persistence format, production dependencies, security, destructive operations,
   or an existing owner decision.
+
+## Git branching and commits
+
+- `master` is the stable integration and submission branch.
+- Perform substantial feature, fix, and refactoring work on short-lived branches
+  created from the latest approved `master`.
+- For an approved substantial integration task, create sequential child feature
+  branches from the latest integration-branch tip. Fast-forward each verified
+  child into the integration branch with `--ff-only` before starting the next.
+- Scope branches to user-visible features or coherent engineering tasks, not to
+  individual classes or files.
+- Codex may create branches and local commits only when explicitly authorized as
+  part of a development task.
+- When local commits are authorized, commit each completed logical unit atomically.
+  Use a short, descriptive, imperative commit message.
+- Before committing, run the relevant automated tests and review the diff for
+  unrelated changes.
+- Keep child-branch commits incremental, coherent, and green. Run the complete
+  Maven verification and review the child diff before integration.
+- Never commit failing changes merely to make progress unless the owner explicitly
+  requests a work-in-progress commit.
+- Unless explicitly authorized by the owner, Codex must not push, merge into
+  `master`, rebase shared history, amend existing commits, force-push, delete
+  branches, or perform destructive Git operations.
+- After an approved committed task, leave the working tree clean and report the
+  resulting branch, commits, and verification performed.
+
+## Testing and coverage
+
+- Design tests from requirements and risks. Cover happy paths, alternative valid
+  paths, invalid inputs, retries, errors, exceptions, state transitions, and
+  interactions between modules.
+- Apply equivalence partitioning and boundary value analysis. Include values below,
+  at, and above every relevant boundary, and test invalid inputs independently
+  before combining them.
+- Run `mvn verify` with the pinned coverage tool. Production code must retain 100%
+  aggregate line and branch coverage, and every uncovered line or branch must be
+  investigated. Coverage exclusions require owner approval.
+- Inspect assertions and the coverage report. A 100% metric is evidence that code
+  executed, not proof that requirements, edge cases, or failure behavior are
+  tested well.
+- For workflows with tentative state, verify that cancellation, role switching,
+  input failure, EOF, and forced termination leave persistent state unchanged.
 
 ## Design and implementation rules
 
