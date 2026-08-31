@@ -10,9 +10,31 @@ and percentage promotions.
 
 - Java 25 LTS
 
-The Maven Wrapper downloads and uses the Maven version pinned by this project.
+## Run the packaged application
 
-## Build and test
+From the project root, run the user-facing release JAR:
+
+On Windows:
+
+```powershell
+java -jar release\cinecli.jar
+```
+
+On macOS or Linux:
+
+```shell
+java -jar release/cinecli.jar
+```
+
+Run CineCLI from the project root because it stores runtime data relative to the
+process working directory.
+
+## Build and test from source
+
+The Maven Wrapper downloads and uses the Maven version pinned by this project.
+It produces the development/build artifact
+`target/cinecli-0.1.0-SNAPSHOT.jar`; this is distinct from the normal packaged
+release at `release/cinecli.jar`.
 
 On Windows:
 
@@ -26,7 +48,7 @@ On macOS or Linux:
 sh ./mvnw clean verify
 ```
 
-## Run
+## Run the Maven-built development artifact
 
 After a successful build:
 

@@ -23,20 +23,20 @@ screenings, prices, and promotions.
 
 ## Getting started
 
-Install Java 25 LTS, then build and run CineCLI from the project root.
+Install Java 25 LTS, then run CineCLI from the project root. CineCLI stores
+runtime data relative to the process working directory, so starting it from the
+project root is important.
 
 On Windows:
 
 ~~~powershell
-.\mvnw.cmd clean verify
-java -jar target\cinecli-0.1.0-SNAPSHOT.jar
+java -jar release\cinecli.jar
 ~~~
 
 On macOS or Linux:
 
 ~~~shell
-sh ./mvnw clean verify
-java -jar target/cinecli-0.1.0-SNAPSHOT.jar
+java -jar release/cinecli.jar
 ~~~
 
 The application starts in Customer Mode. Press ENTER at the welcome screen to

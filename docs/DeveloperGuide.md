@@ -67,7 +67,11 @@ java -jar target/cinecli-0.1.0-SNAPSHOT.jar
 ```
 
 `clean verify` produces the JaCoCo report and enforces 100% aggregate line and
-branch coverage. The packaged JAR starts at `cinecli.app.Main`.
+branch coverage. `target/cinecli-0.1.0-SNAPSHOT.jar` is the Maven
+development/build artifact and starts at `cinecli.app.Main`. The user-facing
+distribution is `release/cinecli.jar`, produced by copying the successfully
+verified Maven artifact; it does not require a Maven version change or another
+packaging mechanism.
 
 ## Architecture
 
