@@ -59,7 +59,7 @@ class MainTest {
                 () -> assertTrue(Files.exists(runtimePricing)),
                 () -> assertTrue(displayedOutput.contains("Welcome to CineCLI")),
                 () -> assertTrue(displayedOutput.contains("Press ENTER to proceed")),
-                () -> assertTrue(displayedOutput.contains("Orbit of Echoes")),
+                () -> assertTrue(displayedOutput.contains("[1] ORBIT OF ECHOES")),
                 () -> assertTrue(displayedOutput.contains("Rating: PG13")),
                 () -> assertTrue(displayedOutput.contains("29 Aug 2026, 13:30")),
                 () -> assertEquals("", errorOutput.toString()),

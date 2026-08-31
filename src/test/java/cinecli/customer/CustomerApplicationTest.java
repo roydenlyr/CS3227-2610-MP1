@@ -53,7 +53,7 @@ class CustomerApplicationTest {
         String output = applicationOutput.normalOutput();
         int welcomeIndex = output.indexOf("Welcome to CineCLI");
         int promptIndex = output.indexOf("Press ENTER to proceed");
-        int movieIndex = output.indexOf("Lanterns Beyond Dawn");
+        int movieIndex = output.indexOf("[1] LANTERNS BEYOND DAWN");
         assertAll(
                 () -> assertTrue(welcomeIndex >= 0),
                 () -> assertTrue(promptIndex > welcomeIndex),
@@ -103,7 +103,7 @@ class CustomerApplicationTest {
 
         assertAll(
                 () -> assertTrue(errorOutput.toString().contains("Unable to load pricing:")),
-                () -> assertFalse(normalOutput.toString().contains("Movie Catalog")),
+                () -> assertFalse(normalOutput.toString().contains("MOVIE CATALOG")),
                 () -> assertFalse(Files.exists(runtimeSeats)),
                 () -> assertEquals("not valid pricing\n", Files.readString(runtimePricing, UTF_8)));
     }
@@ -869,7 +869,7 @@ class CustomerApplicationTest {
     void run_catalogOutputFailure_terminatesBeforeScreeningSelection() throws IOException {
         Path runtimeSeats = tempDirectory.resolve("catalog-output-failure.tsv");
         ScriptedTerminal terminal = new ScriptedTerminal(
-                lines("\n"), text -> !text.contains("Movie Catalog"), () -> { });
+                lines("\n"), text -> !text.contains("MOVIE CATALOG"), () -> { });
 
         CustomerWorkflowOutcome outcome = runWithTerminal(new CustomerUi(terminal), runtimeSeats);
 

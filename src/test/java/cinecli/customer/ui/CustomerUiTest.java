@@ -73,23 +73,67 @@ class CustomerUiTest {
                 () -> assertTrue(error.toString().contains("disk unavailable")),
                 () -> assertTrue(error.toString().contains("pricing unavailable")));
     }
+
     @Test
-    void showCatalog_multipleScreenings_labelsTimingsWithLetters() {
+    void showCatalog_multipleMovies_formatsProminentTitlesAndPreservesDisplayOrder() {
         StringWriter output = new StringWriter();
         CustomerUi customerUi = createUi(output);
-        Movie movie = new Movie(
+        Movie firstMovie = new Movie(
                 "MOV-001",
                 "Orbit of Echoes",
                 ContentRating.PG13,
                 List.of(
                         new Screening("SCR-001", LocalDateTime.of(2026, 8, 29, 13, 30)),
                         new Screening("SCR-002", LocalDateTime.of(2026, 8, 29, 18, 0))));
+        Movie secondMovie = new Movie(
+                "MOV-002",
+                "Midnight Signal",
+                ContentRating.M18,
+                List.of(new Screening("SCR-003", LocalDateTime.of(2026, 8, 30, 16, 15))));
 
-        customerUi.showCatalog(List.of(movie));
+        customerUi.showCatalog(List.of(firstMovie, secondMovie));
+
+        String catalog = output.toString();
+        String catalogTitleRule = "=".repeat(22) + " MOVIE CATALOG " + "=".repeat(22);
+        String catalogSeparatorRule = "-".repeat(56);
+        String expectedCatalog = """
+
+                %s
+
+                [1] ORBIT OF ECHOES
+                    Rating: PG13
+
+                    Screenings
+                    A. 29 Aug 2026, 13:30
+                    B. 29 Aug 2026, 18:00
+
+                %s
+
+                [2] MIDNIGHT SIGNAL
+                    Rating: M18
+
+                    Screenings
+                    A. 30 Aug 2026, 16:15
+
+                %s
+                """.formatted(catalogTitleRule, catalogSeparatorRule, "=".repeat(59))
+                .replace("\n", System.lineSeparator());
 
         assertAll(
-                () -> assertTrue(output.toString().contains("A. 29 Aug 2026, 13:30")),
-                () -> assertTrue(output.toString().contains("B. 29 Aug 2026, 18:00")));
+                () -> assertEquals(expectedCatalog, catalog),
+                () -> assertTrue(catalog.contains("    A. 29 Aug 2026, 13:30")),
+                () -> assertTrue(catalog.contains("    B. 29 Aug 2026, 18:00")));
+    }
+
+    @Test
+    void requestScreeningSelection_displaysMovieNumberPrompt() {
+        StringWriter output = new StringWriter();
+        CustomerUi customerUi = createUi(output);
+
+        customerUi.requestScreeningSelection();
+
+        assertEquals(System.lineSeparator() + "Enter movie number:" + System.lineSeparator(),
+                output.toString());
     }
 
     @Test

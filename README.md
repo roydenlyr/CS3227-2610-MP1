@@ -1,11 +1,10 @@
 # CineCLI
 
-CineCLI is a Java command-line cinema kiosk and administration system under
-incremental development. The current milestone implements the customer welcome
-screen, a persisted movie catalog, screening selection, and a fixed terminal seat
-map with temporary persisted occupancy. Customers assign an Adult, Senior, or
-Student ticket to each confirmed seat, optionally choose snacks and combos, enter
-one optional promo code, and receive an itemized bill.
+CineCLI is a Java command-line cinema kiosk and administration system with
+Customer Mode and Administrator Mode. Customers choose a screening, tentative
+seats, ticket types, snacks or combos, and an optional promotion before receiving
+a bill. Administrators manage movies, screenings, ticket and snack/combo prices,
+and percentage promotions.
 
 ## Prerequisite
 
@@ -41,32 +40,35 @@ On macOS or Linux:
 java -jar target/cinecli-0.1.0-SNAPSHOT.jar
 ```
 
-The application displays `Press ENTER to proceed`. Press ENTER to load the movie
-catalog. Select a screening by combining its movie number and timing letter, such
-as `3B`. Select seats using coordinates such as `G4 G5` and confirm with `Y`.
-Choose one ticket type for each confirmed seat, then choose a snack or combo by its
-menu number and enter a positive whole-number quantity. Repeat for each option,
-then enter `0` to finish. Entering `0` before adding an item skips snacks and
-combos. Choosing the same option again replaces its earlier quantity. At the promo
-prompt, enter `CS2103`, `CS3227`, or press ENTER to skip.
+The application starts in Customer Mode and displays `Press ENTER to proceed`.
+Press ENTER to load the movie catalog. Select a screening by combining its movie
+number and timing letter, such as `3B`, then select seats using coordinates such as
+`G4 G5` and confirm with `Y`. Choose one ticket type for each selected seat, then
+choose snacks or combos by menu number and positive whole-number quantity. Enter
+`0` to finish snack selection (or skip it), then enter an available promotion code
+or press ENTER to skip it. The menus show the current administrator-configured
+prices and promotions.
 
-Adult tickets cost S$11.00, Senior tickets cost S$4.50, and Student tickets cost
-S$7.00. The fixed snack menu offers Popcorn for S$5.00, Nachos for S$6.00, a Soft
-Drink for S$3.00, a Popcorn Combo for S$7.00, and a Nachos Combo for S$8.00.
-`CS2103` discounts the complete ticket-and-snack subtotal by 20%; `CS3227`
-discounts it by 99%. The final fixed-width bill is split into ticket, snack,
-promotion, and final-total sections. It includes the selected movie and screening
-time, seat and ticket details, snack quantities and unit prices, the amount saved,
-and the payable total.
+Enter `/admin` at any prompt to open Administrator Mode. Its Movie Management,
+Screening Management, and Pricing and Promotions Management workflows preview
+every addition, edit, or deletion and save it only after confirmation with `Y`.
+Enter `/customer` to start a new Customer Mode session or `/exit` to exit CineCLI.
+See the User Guide for the complete role workflows and cancellation rules.
 
-On first launch, a missing `data/runtime/catalog.tsv` is initialized from fictional
-defaults bundled inside the JAR. A missing `data/runtime/seats.tsv` is initialized
-when seat selection is first opened.
+Runtime data is stored relative to the directory from which CineCLI is started:
+`data/runtime/catalog.tsv` stores the catalog and administrator movie and screening
+changes; `data/runtime/pricing.tsv` stores ticket and snack/combo prices and
+promotions; and `data/runtime/seats.tsv` stores confirmed seat occupancy. Missing
+catalog and pricing files are initialized from bundled defaults. A missing seat file
+is treated as empty and is created only after successful final seat confirmation.
+Screening deletion and movie deletion with child screenings use a recovery journal
+in `data/runtime/` to protect their coordinated catalog and seat-occupancy updates.
 
-Seat occupancy is a temporary source of truth until booking persistence is
-implemented. Ticket assignments, snack choices, promo codes, and bills are
-session-only. Administration, payment, and complete booking records are not yet
-implemented.
+Confirmed seats remain unavailable across later runs, but seat occupancy is only a
+temporary source of truth until booking persistence is implemented. Ticket
+assignments, snack and combo selections, applied promotion codes, and bills are
+session-only. Payment, complete booking records, cross-process locking, and seat
+reservations are deferred.
 
 ## Documentation
 

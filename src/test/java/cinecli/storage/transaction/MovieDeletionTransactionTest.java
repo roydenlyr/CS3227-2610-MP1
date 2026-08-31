@@ -108,6 +108,46 @@ class MovieDeletionTransactionTest {
     }
 
     @Test
+    void commit_presentOccupancyJournal_hasIndependentCanonicalBytes() throws Exception {
+        String catalog = cascadeCatalog();
+        String seats = """
+                CINECLI-SEATS\t1
+                TAKEN_SEAT\tSCR-2\tB2
+                TAKEN_SEAT\tSCR-1\tA1
+                TAKEN_SEAT\tSCR-3\tC3
+                """;
+        Paths paths = writeState(catalog, seats);
+        MovieDeletionTransaction transaction = transaction(
+                paths, failing(TransactionOperation.VERIFY_CATALOG));
+
+        assertThrows(MovieDeletionCommitException.class,
+                () -> transaction.commit(transaction.prepare("MOV-1")));
+
+        String intendedCatalog = """
+                CINECLI-CATALOG\t1
+                MOVIE\tMOV-2\tSecond\tR21
+                SCREENING\tSCR-3\tMOV-2\t2027-03-04\t12:00
+                """;
+        String intendedSeats = """
+                CINECLI-SEATS\t1
+                TAKEN_SEAT\tSCR-3\tC3
+                """;
+        String expectedJournal = "CINECLI-CATALOG-TRANSACTION\t1\n"
+                + "OPERATION\tDELETE_MOVIE\n"
+                + "SUBJECT_ID\tMOV-1\n"
+                + "CATALOG_ORIGINAL\t" + digest(catalog.getBytes(UTF_8)) + "\t"
+                + Base64.getEncoder().encodeToString(catalog.getBytes(UTF_8)) + "\n"
+                + "CATALOG_INTENDED\t" + digest(intendedCatalog.getBytes(UTF_8)) + "\t"
+                + Base64.getEncoder().encodeToString(intendedCatalog.getBytes(UTF_8)) + "\n"
+                + "SEATS_ORIGINAL\tPRESENT\t" + digest(seats.getBytes(UTF_8)) + "\t"
+                + Base64.getEncoder().encodeToString(seats.getBytes(UTF_8)) + "\n"
+                + "SEATS_INTENDED\tPRESENT\t" + digest(intendedSeats.getBytes(UTF_8)) + "\t"
+                + Base64.getEncoder().encodeToString(intendedSeats.getBytes(UTF_8)) + "\n";
+
+        assertEquals(expectedJournal, Files.readString(paths.journal(), UTF_8));
+    }
+
+    @Test
     void prepare_childlessAndCommit_neverAccessesMalformedSeats() throws Exception {
         String catalog = """
                 CINECLI-CATALOG\t1
@@ -349,6 +389,81 @@ class MovieDeletionTransactionTest {
     }
 
     @Test
+    void commit_publicationFailure_classifiesJournalPostconditionTruthfully() throws Exception {
+        Paths exactPaths = writeState(cascadeCatalog(), "CINECLI-SEATS\t1\n");
+        MovieDeletionTransaction exactTransaction = transaction(exactPaths, (operation, path) -> {
+            if (operation == TransactionOperation.VERIFY_JOURNAL_PUBLICATION) {
+                throw new IOException("reported after publication");
+            }
+        });
+        MovieDeletionCommitException exactFailure = assertThrows(
+                MovieDeletionCommitException.class,
+                () -> exactTransaction.commit(exactTransaction.prepare("MOV-1")));
+
+        assertAll(
+                () -> assertEquals(
+                        MovieDeletionCommitException.Status.RECOVERY_PENDING, exactFailure.status()),
+                () -> assertTrue(Files.exists(exactPaths.journal())),
+                () -> assertEquals(RecoveryResult.RECOVERED, transaction(exactPaths).recover()));
+
+        Paths absentPaths = writeState(cascadeCatalog(), "CINECLI-SEATS\t1\n");
+        byte[] absentCatalog = Files.readAllBytes(absentPaths.catalog());
+        MovieDeletionTransaction absentTransaction = transaction(absentPaths, (operation, path) -> {
+            if (operation == TransactionOperation.VERIFY_JOURNAL_PUBLICATION) {
+                Files.delete(path);
+                throw new IOException("reported after absent publication");
+            }
+        });
+        MovieDeletionCommitException absentFailure = assertThrows(
+                MovieDeletionCommitException.class,
+                () -> absentTransaction.commit(absentTransaction.prepare("MOV-1")));
+
+        assertAll(
+                () -> assertEquals(MovieDeletionCommitException.Status.NOT_APPLIED, absentFailure.status()),
+                () -> assertArrayEquals(absentCatalog, Files.readAllBytes(absentPaths.catalog())),
+                () -> assertFalse(Files.exists(absentPaths.journal())));
+
+        Paths divergentPaths = writeState(cascadeCatalog(), "CINECLI-SEATS\t1\n");
+        byte[] divergentJournal = "divergent journal\\n".getBytes(UTF_8);
+        MovieDeletionTransaction divergentTransaction = transaction(divergentPaths, (operation, path) -> {
+            if (operation == TransactionOperation.VERIFY_JOURNAL_PUBLICATION) {
+                Files.write(path, divergentJournal);
+                throw new IOException("reported after divergent publication");
+            }
+        });
+        MovieDeletionCommitException divergentFailure = assertThrows(
+                MovieDeletionCommitException.class,
+                () -> divergentTransaction.commit(divergentTransaction.prepare("MOV-1")));
+
+        assertAll(
+                () -> assertEquals(
+                        MovieDeletionCommitException.Status.NOT_APPLIED, divergentFailure.status()),
+                () -> assertArrayEquals(divergentJournal, Files.readAllBytes(divergentPaths.journal())),
+                () -> assertThrows(
+                        TransactionStorageException.class, () -> transaction(divergentPaths).recover()),
+                () -> assertArrayEquals(divergentJournal, Files.readAllBytes(divergentPaths.journal())));
+
+        Paths unreadablePaths = writeState(cascadeCatalog(), "CINECLI-SEATS\t1\n");
+        MovieDeletionTransaction unreadableTransaction = transaction(unreadablePaths, (operation, path) -> {
+            if (operation == TransactionOperation.VERIFY_JOURNAL_PUBLICATION) {
+                Files.delete(path);
+                Files.createDirectory(path);
+                throw new IOException("reported with unreadable publication state");
+            }
+        });
+        MovieDeletionCommitException unreadableFailure = assertThrows(
+                MovieDeletionCommitException.class,
+                () -> unreadableTransaction.commit(unreadableTransaction.prepare("MOV-1")));
+
+        assertAll(
+                () -> assertEquals(
+                        MovieDeletionCommitException.Status.NOT_APPLIED, unreadableFailure.status()),
+                () -> assertTrue(Files.isDirectory(unreadablePaths.journal())),
+                () -> assertThrows(
+                        TransactionStorageException.class, () -> transaction(unreadablePaths).recover()));
+    }
+
+    @Test
     void recover_readOrCleanupFault_retainsValidJournalForRetry() throws Exception {
         Paths paths = writeState(cascadeCatalog(), "CINECLI-SEATS\t1\n");
         MovieDeletionTransaction interrupted = transaction(
@@ -427,6 +542,30 @@ class MovieDeletionTransactionTest {
 
         Files.write(paths.journal(), new byte[] {(byte) 0xC3});
         assertThrows(TransactionStorageException.class, () -> transaction(paths).recover());
+    }
+
+    @Test
+    void recover_childlessMovieJournal_blocksWithoutMutatingTargets() throws Exception {
+        String originalCatalog = "CINECLI-CATALOG\t1\nMOVIE\tMOV-1\tFirst\tPG13\n";
+        String intendedCatalog = "CINECLI-CATALOG\t1\n";
+        Paths paths = writeState(originalCatalog, null);
+        String journal = "CINECLI-CATALOG-TRANSACTION\t1\n"
+                + "OPERATION\tDELETE_MOVIE\n"
+                + "SUBJECT_ID\tMOV-1\n"
+                + "CATALOG_ORIGINAL\t" + digest(originalCatalog.getBytes(UTF_8)) + "\t"
+                + Base64.getEncoder().encodeToString(originalCatalog.getBytes(UTF_8)) + "\n"
+                + "CATALOG_INTENDED\t" + digest(intendedCatalog.getBytes(UTF_8)) + "\t"
+                + Base64.getEncoder().encodeToString(intendedCatalog.getBytes(UTF_8)) + "\n"
+                + "SEATS_ORIGINAL\tMISSING\n"
+                + "SEATS_INTENDED\tMISSING\n";
+        Files.writeString(paths.journal(), journal, UTF_8);
+
+        assertThrows(TransactionStorageException.class, () -> transaction(paths).recover());
+
+        assertAll(
+                () -> assertEquals(originalCatalog, Files.readString(paths.catalog(), UTF_8)),
+                () -> assertFalse(Files.exists(paths.seats())),
+                () -> assertEquals(journal, Files.readString(paths.journal(), UTF_8)));
     }
 
     @Test

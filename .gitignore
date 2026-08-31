@@ -18,6 +18,7 @@ Thumbs.db
 # Mutable application data
 /data/runtime/*
 !/data/runtime/.gitkeep
+/release/data/runtime/*
 
 # JVM diagnostics
 hs_err_pid*
@@ -31,4 +32,3 @@ replay_pid*
 *.swp
 *.tmp
 *~
-

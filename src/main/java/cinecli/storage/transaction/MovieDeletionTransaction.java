@@ -272,13 +272,14 @@ public final class MovieDeletionTransaction {
             throws CommitFailure {
         Path temporaryJournal = null;
         boolean isJournalPublished = false;
+        byte[] journalBytes = null;
         try {
             if (Files.exists(journalPath)) {
                 throw new IOException("transaction journal already exists");
             }
             requireCatalogOriginal(deletion.originalCatalogBytes);
             requireSeatsOriginal(deletion.originalSeats);
-            byte[] journalBytes = serializeJournal(operation, subjectId, deletion);
+            journalBytes = serializeJournal(operation, subjectId, deletion);
             Files.createDirectories(journalPath.getParent());
             operationHook.before(TransactionOperation.CREATE_JOURNAL_TEMPORARY, journalPath.getParent());
             temporaryJournal = Files.createTempFile(
@@ -295,6 +296,7 @@ public final class MovieDeletionTransaction {
             }
             operationHook.before(TransactionOperation.PUBLISH_JOURNAL, journalPath);
             Files.move(temporaryJournal, journalPath, StandardCopyOption.ATOMIC_MOVE);
+            operationHook.before(TransactionOperation.VERIFY_JOURNAL_PUBLICATION, journalPath);
             isJournalPublished = true;
             catalogAdapter.replace(deletion.intendedCatalogBytes);
             if (!sameSnapshot(deletion.originalSeats, deletion.intendedSeats)) {
@@ -311,7 +313,7 @@ public final class MovieDeletionTransaction {
             operationHook.before(TransactionOperation.DELETE_JOURNAL, journalPath);
             Files.delete(journalPath);
         } catch (Exception exception) {
-            Status status = isJournalPublished ? Status.RECOVERY_PENDING : Status.NOT_APPLIED;
+            Status status = journalPublicationStatus(isJournalPublished, journalBytes);
             throw new CommitFailure(status, exception);
         } finally {
             if (!isJournalPublished && temporaryJournal != null) {
@@ -323,6 +325,21 @@ public final class MovieDeletionTransaction {
                     // An unpublished temporary file is not durable intent.
                 }
             }
+        }
+    }
+
+    private Status journalPublicationStatus(boolean isJournalPublished, byte[] candidateJournal) {
+        if (isJournalPublished) {
+            return Status.RECOVERY_PENDING;
+        }
+        try {
+            return candidateJournal != null
+                    && Files.exists(journalPath)
+                    && Arrays.equals(Files.readAllBytes(journalPath), candidateJournal)
+                            ? Status.RECOVERY_PENDING
+                            : Status.NOT_APPLIED;
+        } catch (IOException exception) {
+            return Status.NOT_APPLIED;
         }
     }
 
@@ -569,8 +586,11 @@ public final class MovieDeletionTransaction {
             DeletionOperation operation, List<Movie> originalCatalog, String subjectId)
             throws TransactionStorageException {
         if (operation == DeletionOperation.DELETE_MOVIE) {
-            boolean isKnown = originalCatalog.stream().anyMatch(movie -> movie.id().equals(subjectId));
-            if (!isKnown) {
+            Movie subject = originalCatalog.stream()
+                    .filter(movie -> movie.id().equals(subjectId))
+                    .findFirst()
+                    .orElse(null);
+            if (subject == null || subject.screenings().isEmpty()) {
                 throw malformedJournal();
             }
             return originalCatalog.stream().filter(movie -> !movie.id().equals(subjectId)).toList();

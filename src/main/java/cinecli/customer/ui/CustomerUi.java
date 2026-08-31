@@ -36,6 +36,12 @@ public final class CustomerUi {
             (BILL_WIDTH + BILL_TITLE.length()) / 2;
     private static final String BILL_MAJOR_RULE = "=".repeat(BILL_WIDTH);
     private static final String BILL_SECTION_RULE = "-".repeat(BILL_WIDTH);
+    private static final String CATALOG_TITLE = "MOVIE CATALOG";
+    private static final String CATALOG_HEADER_RULE = "=".repeat(22);
+    private static final String CATALOG_SEPARATOR_RULE = "-".repeat(56);
+    private static final String CATALOG_TITLE_RULE = CATALOG_HEADER_RULE + " " + CATALOG_TITLE
+            + " " + CATALOG_HEADER_RULE;
+    private static final String CATALOG_FOOTER_RULE = "=".repeat(CATALOG_TITLE_RULE.length());
     private static final DateTimeFormatter SCREENING_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMM uuuu, HH:mm", Locale.ENGLISH);
     private static final String NO_MOVIES_MESSAGE = "No movies are currently available.";
@@ -116,7 +122,7 @@ public final class CustomerUi {
      */
     public TerminalInput requestScreeningSelection() {
         output.println();
-        output.println("Select a screening using the movie number and timing letter (e.g., 3B):");
+        output.println("Enter movie number:");
         return readInput();
     }
 
@@ -590,15 +596,24 @@ public final class CustomerUi {
     public void showCatalog(List<Movie> movies) {
         Objects.requireNonNull(movies);
         output.println();
-        output.println("Movie Catalog");
+        output.println(CATALOG_TITLE_RULE);
         if (movies.isEmpty()) {
             output.println(NO_MOVIES_MESSAGE);
+            output.println(CATALOG_FOOTER_RULE);
             return;
         }
 
+        output.println();
         for (int i = 0; i < movies.size(); i++) {
+            if (i > 0) {
+                output.println();
+                output.println(CATALOG_SEPARATOR_RULE);
+                output.println();
+            }
             showMovie(i + 1, movies.get(i));
         }
+        output.println();
+        output.println(CATALOG_FOOTER_RULE);
     }
 
     /**
@@ -611,18 +626,19 @@ public final class CustomerUi {
     }
 
     private void showMovie(int displayNumber, Movie movie) {
-        output.println(displayNumber + ". " + movie.title());
-        output.println("   Rating: " + movie.contentRating());
-        output.println("   Screenings:");
+        output.println("[" + displayNumber + "] " + movie.title().toUpperCase(Locale.ROOT));
+        output.println("    Rating: " + movie.contentRating());
+        output.println();
+        output.println("    Screenings");
         if (movie.screenings().isEmpty()) {
-            output.println("   No screenings available.");
+            output.println("    No screenings available.");
             return;
         }
 
         for (int i = 0; i < movie.screenings().size(); i++) {
             Screening screening = movie.screenings().get(i);
             String timingLabel = ScreeningSelection.formatTimingLabel(i + 1);
-            output.println("   " + timingLabel + ". "
+            output.println("    " + timingLabel + ". "
                     + screening.startsAt().format(SCREENING_TIME_FORMATTER));
         }
     }
